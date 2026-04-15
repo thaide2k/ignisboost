@@ -1,0 +1,136 @@
+.result-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background: 
+    radial-gradient(ellipse at top, #1a1a2e 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, #16213e 0%, transparent 50%),
+    var(--bg-dark);
+}
+
+.result-card {
+  background: rgba(30, 30, 30, 0.95);
+  border: 2px solid var(--border-color);
+  border-radius: 20px;
+  padding: 3rem;
+  text-align: center;
+  max-width: 450px;
+  width: 100%;
+  animation: slideUp 0.4s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.result-card.success {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 40px rgba(74, 222, 128, 0.2);
+}
+
+.result-card.failed {
+  border-color: var(--accent-red);
+  box-shadow: 0 0 40px rgba(255, 59, 59, 0.2);
+}
+
+.result-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.result-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.1em;
+}
+
+.result-card.success .result-title {
+  color: var(--accent-green);
+}
+
+.result-card.failed .result-title {
+  color: var(--accent-red);
+}
+
+.result-reason {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+}
+
+.rewards-section {
+  background: var(--bg-dark);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.rewards-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.reward-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.reward-row:last-child {
+  border-bottom: none;
+}
+
+.reward-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.reward-value {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.reward-value.money {
+  color: var(--accent-green);
+}
+
+.reward-value.xp {
+  color: var(--accent-blue);
+}
+
+.return-button {
+  width: 100%;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--accent-orange);
+  color: var(--bg-dark);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.return-button:hover {
+  background: var(--accent-orange-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(255, 107, 53, 0.4);
+}

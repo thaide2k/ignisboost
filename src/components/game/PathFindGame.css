@@ -1,0 +1,108 @@
+.pathfind-container {
+  width: 350px;
+  max-width: 90vw;
+}
+
+.pathfind-progress {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.pathfind-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff88, #00ffaa);
+  transition: width 0.05s linear;
+}
+
+.pathfind-iteration {
+  color: #888;
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.pathfind-game-area {
+  position: relative;
+  width: 100%;
+  height: 250px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.pathfind-node {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #444;
+  border: 2px solid #666;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: all 0.15s ease;
+  z-index: 10;
+}
+
+.pathfind-node:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+  border-color: #fff;
+}
+
+.pathfind-node.root {
+  width: 32px;
+  height: 32px;
+  background: #00ff88;
+  border: 3px solid #00ffaa;
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+  animation: pulse-green 1.5s infinite;
+}
+
+.pathfind-node.active {
+  background: #ffaa00;
+  border-color: #ffcc00;
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.6);
+  animation: pulse-orange 1s infinite;
+}
+
+.pathfind-node.completed {
+  background: #00ff88;
+  border-color: #00ffaa;
+}
+
+.pathfind-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.pathfind-line {
+  stroke: #00ff88;
+  stroke-width: 3;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.8));
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+  }
+}
+
+@keyframes pulse-orange {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 170, 0, 0.8);
+  }
+}
