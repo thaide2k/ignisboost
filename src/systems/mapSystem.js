@@ -205,20 +205,22 @@ export const BUILDING_VARIANTS = {
 const SPRITE_SIZE = 16
 
 export const loadSprites = () => {
-  return new Promise((resolve) => {
-    resolve({})
-  })
+  return Promise.all([
+    loadImage('/assets/sprites/streets_1.png'),
+    loadImage('/assets/sprites/streets_2.png')
+  ]).then(([streets1, streets2]) => ({
+    streets1,
+    streets2
+  }))
 }
 
 const loadImage = (src) => {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
-      console.log('[Sprite] Loaded:', src, img.width, 'x', img.height)
       resolve(img)
     }
     img.onerror = (e) => {
-      console.error('[Sprite] Failed to load:', src, e)
       reject(e)
     }
     img.src = src
