@@ -26,90 +26,162 @@ const mulberry32 = (a) => {
 }
 
 export const generateCity = (width = 60, height = 60, seed = 1) => {
-  const rand = mulberry32(seed);
+  const rand = mulberry32(seed)
 
   const tiles = Array.from({ length: height }, () =>
-    Array.from({ length: width }, () => 1)
-  );
+    Array.from({ length: width }, () => TILE_TYPES.BUILDING)
+  )
 
-  const roadSpacing = 8 + Math.floor(rand() * 4);
+  const margin = 2
 
-  for (let y = 2; y < height - 2; y += roadSpacing) {
-    for (let x = 0; x < width; x++) {
-      tiles[y][x] = 0;
-      tiles[y + 1][x] = 0;
+  const clampI = (v, min, max) => Math.max(min, Math.min(max, v | 0))
+  const carveRect = (x0, y0, w, h, type) => {
+    const x1 = clampI(x0 + w, 0, width)
+    const y1 = clampI(y0 + h, 0, height)
+    for (let y = clampI(y0, 0, height); y < y1; y++) {
+      for (let x = clampI(x0, 0, width); x < x1; x++) {
+        tiles[y][x] = type
+      }
     }
   }
-
-  for (let x = 2; x < width - 2; x += roadSpacing) {
-    for (let y = 0; y < height; y++) {
-      tiles[y][x] = 0;
-      tiles[y][x + 1] = 0;
-    }
+  const carveH = (y, x0, x1, w, type) => {
+    carveRect(x0, y - Math.floor(w / 2), x1 - x0 + 1, w, type)
+  }
+  const carveV = (x, y0, y1, w, type) => {
+    carveRect(x - Math.floor(w / 2), y0, w, y1 - y0 + 1, type)
   }
 
-  const alleyCount = Math.floor((width * height) / 120);
+  const majorSpacing = 12 + Math.floor(rand() * 3)
+  const majorWidth = 3
+  const minorWidth = 2
+  const majorOffsetX = margin + Math.floor(rand() * 3)
+  const majorOffsetY = margin + Math.floor(rand() * 3)
 
-  for (let i = 0; i < alleyCount; i++) {
-    let x = Math.floor(rand() * width);
-    let y = Math.floor(rand() * height);
+  const majorRoadXs = []
+  const majorRoadYs = []
 
-    const length = 4 + Math.floor(rand() * 8);
-    const horizontal = rand() > 0.5;
+  for (let y = majorOffsetY; y < height - margin; y += majorSpacing) {
+    carveH(y, 0, width - 1, majorWidth, TILE_TYPES.ROAD)
+    majorRoadYs.push(y)
+  }
+  for (let x = majorOffsetX; x < width - margin; x += majorSpacing) {
+    carveV(x, 0, height - 1, majorWidth, TILE_TYPES.ROAD)
+    majorRoadXs.push(x)
+  }
 
-    for (let j = 0; j < length; j++) {
-      if (x >= 0 && x < width && y >= 0 && y < height) {
-        if (tiles[y][x] === 1) tiles[y][x] = 2;
+  const boundsWithEdges = (arr, max) => {
+    const b = [margin, ...arr, max - 1 - margin]
+    b.sort((a, z) => a - z)
+    const out = []
+    for (const v of b) {
+      if (!out.length || out[out.length - 1] !== v) out.push(v)
+    }
+    return out
+  }
+
+  const xBounds = boundsWithEdges(majorRoadXs, width)
+  const yBounds = boundsWithEdges(majorRoadYs, height)
+
+  const inBounds = (x, y) => x >= margin && x < width - margin && y >= margin && y < height - margin
+
+  for (let by = 0; by < yBounds.length - 1; by++) {
+    for (let bx = 0; bx < xBounds.length - 1; bx++) {
+      const x0 = xBounds[bx]
+      const x1 = xBounds[bx + 1]
+      const y0 = yBounds[by]
+      const y1 = yBounds[by + 1]
+
+      const blockW = x1 - x0
+      const blockH = y1 - y0
+
+      if (blockW >= 10 && rand() < 0.85) {
+        const rx = clampI(x0 + 4 + Math.floor(rand() * (blockW - 8)), margin, width - 1 - margin)
+        carveV(rx, y0, y1, minorWidth, TILE_TYPES.ROAD)
+      }
+      if (blockH >= 10 && rand() < 0.85) {
+        const ry = clampI(y0 + 4 + Math.floor(rand() * (blockH - 8)), margin, height - 1 - margin)
+        carveH(ry, x0, x1, minorWidth, TILE_TYPES.ROAD)
       }
 
-      if (horizontal) x++;
-      else y++;
-    }
-  }
-
-  for (let i = 0; i < alleyCount / 2; i++) {
-    let x = Math.floor(rand() * width);
-    let y = Math.floor(rand() * height);
-
-    for (let j = 0; j < 6; j++) {
-      if (tiles[y] && tiles[y][x] !== undefined) {
-        if (tiles[y][x] !== 1) tiles[y][x] = 0;
+      if (blockW >= 10 && blockH >= 10 && rand() < 0.18) {
+        const parkW = 4 + Math.floor(rand() * 6)
+        const parkH = 4 + Math.floor(rand() * 6)
+        const px0 = clampI(x0 + 3 + Math.floor(rand() * Math.max(1, blockW - parkW - 6)), margin, width - 1 - margin)
+        const py0 = clampI(y0 + 3 + Math.floor(rand() * Math.max(1, blockH - parkH - 6)), margin, height - 1 - margin)
+        carveRect(px0, py0, parkW, parkH, TILE_TYPES.GREEN)
       }
 
-      x += Math.floor(rand() * 3) - 1;
-      y += Math.floor(rand() * 3) - 1;
+      if (blockW >= 12 && blockH >= 10 && rand() < 0.22) {
+        const lotW = 5 + Math.floor(rand() * 6)
+        const lotH = 4 + Math.floor(rand() * 5)
+        const side = Math.floor(rand() * 4)
+        let lx0 = x0 + 2
+        let ly0 = y0 + 2
+        if (side === 0) {
+          lx0 = x0 + 2
+          ly0 = clampI(y0 + 3 + Math.floor(rand() * Math.max(1, blockH - lotH - 6)), margin, height - 1 - margin)
+        } else if (side === 1) {
+          lx0 = clampI(x1 - lotW - 2, margin, width - 1 - margin)
+          ly0 = clampI(y0 + 3 + Math.floor(rand() * Math.max(1, blockH - lotH - 6)), margin, height - 1 - margin)
+        } else if (side === 2) {
+          lx0 = clampI(x0 + 3 + Math.floor(rand() * Math.max(1, blockW - lotW - 6)), margin, width - 1 - margin)
+          ly0 = y0 + 2
+        } else {
+          lx0 = clampI(x0 + 3 + Math.floor(rand() * Math.max(1, blockW - lotW - 6)), margin, width - 1 - margin)
+          ly0 = clampI(y1 - lotH - 2, margin, height - 1 - margin)
+        }
+        carveRect(lx0, ly0, lotW, lotH, TILE_TYPES.PARKING)
+      }
+
+      const alleySegments = 1 + Math.floor(rand() * 3)
+      for (let i = 0; i < alleySegments; i++) {
+        const startX = clampI(x0 + 2 + Math.floor(rand() * Math.max(1, blockW - 4)), margin, width - 1 - margin)
+        const startY = clampI(y0 + 2 + Math.floor(rand() * Math.max(1, blockH - 4)), margin, height - 1 - margin)
+        const length = 4 + Math.floor(rand() * 8)
+        const dirs = [
+          { x: 1, y: 0 },
+          { x: -1, y: 0 },
+          { x: 0, y: 1 },
+          { x: 0, y: -1 }
+        ]
+        const d = dirs[Math.floor(rand() * dirs.length)]
+        let ax = startX
+        let ay = startY
+        for (let j = 0; j < length; j++) {
+          if (!inBounds(ax, ay)) break
+          if (tiles[ay][ax] === TILE_TYPES.BUILDING) tiles[ay][ax] = TILE_TYPES.ALLEY
+          ax += d.x
+          ay += d.y
+        }
+      }
     }
   }
 
-  const spawns = [];
-  const minDistance = 8;
-
+  const spawns = []
+  const minDistance = 10
+  const isWalk = (t) => t === TILE_TYPES.ROAD || t === TILE_TYPES.ALLEY || t === TILE_TYPES.PARKING
   const isValidSpawn = (x, y) => {
-    if (!tiles[y] || tiles[y][x] !== 0) return false;
+    if (!tiles[y] || !isWalk(tiles[y][x])) return false
     for (const spawn of spawns) {
-      const dist = Math.sqrt(Math.pow(spawn.x - x, 2) + Math.pow(spawn.y - y, 2));
-      if (dist < minDistance) return false;
+      const dx = spawn.x - x
+      const dy = spawn.y - y
+      if (Math.sqrt(dx * dx + dy * dy) < minDistance) return false
     }
-    return true;
-  };
+    return true
+  }
 
-  let attempts = 0;
-  while (spawns.length < 6 && attempts < 1000) {
-    const x = Math.floor(rand() * width);
-    const y = Math.floor(rand() * height);
-    
-    if (isValidSpawn(x, y)) {
-      spawns.push({ x, y });
-    }
-    attempts++;
+  let attempts = 0
+  while (spawns.length < 6 && attempts < 2000) {
+    const x = margin + Math.floor(rand() * (width - margin * 2))
+    const y = margin + Math.floor(rand() * (height - margin * 2))
+    if (isValidSpawn(x, y)) spawns.push({ x, y })
+    attempts++
   }
 
   if (spawns.length < 6) {
-    for (let y = 0; y < height && spawns.length < 6; y++) {
-      for (let x = 0; x < width && spawns.length < 6; x++) {
-        if (isValidSpawn(x, y)) {
-          spawns.push({ x, y });
-        }
+    for (let y = margin; y < height - margin && spawns.length < 6; y++) {
+      for (let x = margin; x < width - margin && spawns.length < 6; x++) {
+        if (isValidSpawn(x, y)) spawns.push({ x, y })
       }
     }
   }
@@ -118,9 +190,9 @@ export const generateCity = (width = 60, height = 60, seed = 1) => {
     width,
     height,
     tiles,
-    collision: "derive_from_tiles",
+    collision: 'derive_from_tiles',
     spawns
-  };
+  }
 }
 
 export const BUILDING_VARIANTS = {
@@ -232,17 +304,20 @@ export const loadMapFromJson = async (jsonUrl) => {
       const typeRow = []
       for (let x = 0; x < mapWidth; x++) {
         const tileValue = tileValues[y]?.[x] ?? 1
-        
-        if (tileValue === MAP_TILE_VALUES.STREET) {
-          row.push(TILE_TYPES.ROAD)
-          typeRow.push(null)
-        } else if (tileValue === MAP_TILE_VALUES.BUILDING) {
+
+        const normalized =
+          tileValue === MAP_TILE_VALUES.STREET ? TILE_TYPES.ROAD :
+          tileValue === MAP_TILE_VALUES.BUILDING ? TILE_TYPES.BUILDING :
+          tileValue === MAP_TILE_VALUES.ALLEY ? TILE_TYPES.ALLEY :
+          tileValue
+
+        if (normalized === TILE_TYPES.BUILDING) {
           row.push(TILE_TYPES.BUILDING)
           const variants = Object.values(BUILDING_VARIANTS)
           const variantIndex = (x + y) % variants.length
           typeRow.push(variants[variantIndex])
-        } else if (tileValue === MAP_TILE_VALUES.ALLEY) {
-          row.push(TILE_TYPES.ALLEY)
+        } else if (normalized === TILE_TYPES.ROAD || normalized === TILE_TYPES.ALLEY || normalized === TILE_TYPES.PARKING || normalized === TILE_TYPES.GREEN) {
+          row.push(normalized)
           typeRow.push(null)
         } else {
           row.push(TILE_TYPES.BUILDING)
@@ -293,14 +368,16 @@ export const generateMap = (seed = 1) => {
     for (let x = 0; x < cityData.width; x++) {
       const tileValue = cityData.tiles[y][x]
       
-      if (tileValue === MAP_TILE_VALUES.STREET) {
-        row.push(TILE_TYPES.ROAD)
-        typeRow.push(null)
-      } else if (tileValue === MAP_TILE_VALUES.BUILDING) {
+      if (tileValue === TILE_TYPES.BUILDING || tileValue === MAP_TILE_VALUES.BUILDING) {
         row.push(TILE_TYPES.BUILDING)
         typeRow.push(getRandomVariant())
-      } else if (tileValue === MAP_TILE_VALUES.ALLEY) {
-        row.push(TILE_TYPES.ALLEY)
+      } else if (
+        tileValue === TILE_TYPES.ROAD || tileValue === MAP_TILE_VALUES.STREET ||
+        tileValue === TILE_TYPES.ALLEY || tileValue === MAP_TILE_VALUES.ALLEY ||
+        tileValue === TILE_TYPES.PARKING ||
+        tileValue === TILE_TYPES.GREEN
+      ) {
+        row.push(tileValue === MAP_TILE_VALUES.STREET ? TILE_TYPES.ROAD : tileValue)
         typeRow.push(null)
       } else {
         row.push(TILE_TYPES.BUILDING)
