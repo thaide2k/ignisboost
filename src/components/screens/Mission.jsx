@@ -277,7 +277,8 @@ function Mission({ contract, onComplete, onExit }) {
       
       const zoom = player.hasCar ? 0.86 : 0.92
       const speedScale = 1 / zoom
-      const speed = (player.hasCar ? 1 : 0.8) * speedScale
+      const baseSpeed = player.hasCar ? 1.55 : 0.9
+      const speed = baseSpeed * speedScale
       
       let dx = 0
       let dy = 0
