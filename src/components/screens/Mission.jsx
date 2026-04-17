@@ -250,7 +250,9 @@ function Mission({ contract, onComplete, onExit }) {
       const delivery = deliveryRef.current
       const police = policeRef.current
       
-      const speed = player.hasCar ? 1 : 0.8
+      const zoom = player.hasCar ? 0.86 : 0.92
+      const speedScale = 1 / zoom
+      const speed = (player.hasCar ? 1 : 0.8) * speedScale
       
       let dx = 0
       let dy = 0
@@ -343,10 +345,10 @@ function Mission({ contract, onComplete, onExit }) {
       
       police.forEach((cop, index) => {
         const behavior = getPoliceBehavior(cop, player, heat, map)
-        cop.x += behavior.vx
-        cop.y += behavior.vy
-        cop.vx = behavior.vx
-        cop.vy = behavior.vy
+        cop.x += behavior.vx * speedScale
+        cop.y += behavior.vy * speedScale
+        cop.vx = behavior.vx * speedScale
+        cop.vy = behavior.vy * speedScale
         if (cop.vx !== 0 || cop.vy !== 0) {
           cop.angle = Math.atan2(cop.vy, cop.vx)
         }
@@ -385,7 +387,6 @@ function Mission({ contract, onComplete, onExit }) {
       const mapWidth = MAP_WIDTH * TILE_SIZE
       const mapHeight = MAP_HEIGHT * TILE_SIZE
 
-      const zoom = player.hasCar ? 0.86 : 0.92
       const viewW = canvas.width / zoom
       const viewH = canvas.height / zoom
 
