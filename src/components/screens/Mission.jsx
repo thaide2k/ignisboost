@@ -1,14 +1,124 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, generateMap, getTileColor, isWalkable, getBuildingVariant, getBuildingVariantColor, BUILDING_VARIANTS, loadSprites, getBuildingSprite, loadTiledMap } from '../../systems/mapSystem'
-import { calculateRewards, isMissionExpired } from '../../systems/missionSystem'
+import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, generateMap, getTileColor, isWalkable, getBuildingVariantColor, loadSprites, getBuildingSprite } from '../../systems/mapSystem'
+import { calculateRewards } from '../../systems/missionSystem'
 import { getHeatColor, getPoliceBehavior } from '../../systems/heatSystem'
-import { getCarEmoji } from '../../systems/carSprites'
 import CarStealMiniGame from '../game/CarStealMiniGame'
 import PathFindGame from '../game/PathFindGame'
 import './Mission.css'
 
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
+
+const hash01 = (x, y, seed = 1) => {
+  let t = (x * 374761393 + y * 668265263 + seed * 1442695041) | 0
+  t = (t ^ (t >>> 13)) | 0
+  t = Math.imul(t, 1274126177)
+  return (((t >>> 0) & 0xffffff) / 0x1000000)
+}
+
+const roundRect = (ctx, x, y, w, h, r) => {
+  const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2))
+  ctx.beginPath()
+  ctx.moveTo(x + rr, y)
+  ctx.lineTo(x + w - rr, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr)
+  ctx.lineTo(x + w, y + h - rr)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h)
+  ctx.lineTo(x + rr, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rr)
+  ctx.lineTo(x, y + rr)
+  ctx.quadraticCurveTo(x, y, x + rr, y)
+  ctx.closePath()
+}
+
+const drawCar = (ctx, x, y, angle, color, now, opts = {}) => {
+  const w = opts.w ?? 28
+  const h = opts.h ?? 16
+  const r = opts.r ?? 4
+  const siren = opts.siren ?? false
+  const highlight = opts.highlight ?? null
+
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(angle)
+
+  ctx.globalAlpha = 0.22
+  ctx.fillStyle = '#000000'
+  roundRect(ctx, -w / 2 + 3, -h / 2 + 4, w, h, r)
+  ctx.fill()
+
+  ctx.globalAlpha = 1
+  ctx.fillStyle = color
+  roundRect(ctx, -w / 2, -h / 2, w, h, r)
+  ctx.fill()
+
+  ctx.fillStyle = 'rgba(255,255,255,0.10)'
+  roundRect(ctx, -w / 4, -h / 2 + 2, w / 2, h / 2.2, 2)
+  ctx.fill()
+
+  ctx.globalAlpha = 0.22
+  ctx.fillStyle = '#ffd27d'
+  ctx.fillRect(w / 2 - 1, -h / 4, 10, h / 2)
+  ctx.globalAlpha = 1
+
+  if (siren) {
+    const phase = Math.floor(now / 120) % 2
+    ctx.fillStyle = phase === 0 ? '#ff3b3b' : '#3b82f6'
+    roundRect(ctx, -w / 6, -h / 2 - 3, w / 3, 5, 2)
+    ctx.fill()
+  }
+
+  if (highlight) {
+    ctx.lineWidth = 2
+    ctx.strokeStyle = highlight
+    roundRect(ctx, -w / 2 - 2, -h / 2 - 2, w + 4, h + 4, r + 2)
+    ctx.stroke()
+  }
+
+  ctx.restore()
+}
+
+const drawPed = (ctx, x, y, angle, now, opts = {}) => {
+  const r = opts.r ?? 6
+  const color = opts.color ?? '#4ade80'
+
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(angle)
+
+  ctx.globalAlpha = 0.2
+  ctx.fillStyle = '#000000'
+  ctx.beginPath()
+  ctx.ellipse(2, 6, r * 0.9, r * 0.55, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.globalAlpha = 1
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.arc(0, 0, r, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.globalAlpha = 0.9
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(r + 4, 0)
+  ctx.stroke()
+  ctx.globalAlpha = 1
+
+  const blink = Math.floor(now / 240) % 2 === 0
+  if (opts.highlight && blink) {
+    ctx.lineWidth = 2
+    ctx.strokeStyle = opts.highlight
+    ctx.beginPath()
+    ctx.arc(0, 0, r + 3, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
+  ctx.restore()
+}
+
 function Mission({ contract, onComplete, onExit }) {
-  const carEmoji = getCarEmoji(contract.carType)
   const canvasRef = useRef(null)
   const minimapRef = useRef(null)
   const MINIMAP_SIZE = 150
@@ -17,6 +127,7 @@ function Mission({ contract, onComplete, onExit }) {
   const [heat, setHeat] = useState(0)
   const [phase, setPhase] = useState('steal')
   const [showMiniGame, setShowMiniGame] = useState(false)
+  const showMiniGameRef = useRef(false)
   const [miniGameType, setMiniGameType] = useState('hotwire')
   const [map, setMap] = useState(null)
 
@@ -47,24 +158,21 @@ function Mission({ contract, onComplete, onExit }) {
   }, [])
   
   useEffect(() => {
-    console.log('[Mission] Loading sprites...')
     loadSprites().then((loaded) => {
-      console.log('[Mission] Sprites loaded, buildings:', loaded.buildings?.naturalWidth)
       setSprites(loaded)
-      
-      if (loaded.buildings?.complete && loaded.buildings.naturalWidth > 0) {
-        console.log('[Mission] SUCCESS: Sprites are ready!')
-      } else {
-        console.log('[Mission] ISSUE: Sprites not complete')
-      }
-    }).catch((e) => console.error('[Mission] Sprite error:', e))
+    }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    showMiniGameRef.current = showMiniGame
+  }, [showMiniGame])
   
   const playerRef = useRef({
     x: map?.spawnPoints?.player?.x ? map.spawnPoints.player.x * TILE_SIZE + TILE_SIZE / 2 : 0,
     y: map?.spawnPoints?.player?.y ? map.spawnPoints.player.y * TILE_SIZE + TILE_SIZE / 2 : 0,
     vx: 0,
     vy: 0,
+    angle: 0,
     hasCar: false,
     speed: 4
   })
@@ -151,6 +259,12 @@ function Mission({ contract, onComplete, onExit }) {
       if (keysRef.current['s'] || keysRef.current['arrowdown']) dy = speed
       if (keysRef.current['a'] || keysRef.current['arrowleft']) dx = -speed
       if (keysRef.current['d'] || keysRef.current['arrowright']) dx = speed
+
+      player.vx = dx
+      player.vy = dy
+      if (dx !== 0 || dy !== 0) {
+        player.angle = Math.atan2(dy, dx)
+      }
       
       const newX = player.x + dx
       const newY = player.y + dy
@@ -168,9 +282,9 @@ function Mission({ contract, onComplete, onExit }) {
           Math.pow(player.y - targetCar.y, 2)
         )
         
-        if (distToCar < 40 && !showMiniGame) {
-          console.log('Showing minigame! Type:', miniGameType)
+        if (distToCar < 40 && !showMiniGameRef.current) {
           setMiniGameType('hotwire')
+          showMiniGameRef.current = true
           setShowMiniGame(true)
         }
       }
@@ -231,6 +345,11 @@ function Mission({ contract, onComplete, onExit }) {
         const behavior = getPoliceBehavior(cop, player, heat, map)
         cop.x += behavior.vx
         cop.y += behavior.vy
+        cop.vx = behavior.vx
+        cop.vy = behavior.vy
+        if (cop.vx !== 0 || cop.vy !== 0) {
+          cop.angle = Math.atan2(cop.vy, cop.vx)
+        }
         
         const distToPlayer = Math.sqrt(
           Math.pow(player.x - cop.x, 2) + 
@@ -265,26 +384,40 @@ function Mission({ contract, onComplete, onExit }) {
       
       const mapWidth = MAP_WIDTH * TILE_SIZE
       const mapHeight = MAP_HEIGHT * TILE_SIZE
-      
-      const targetCamX = player.x - canvas.width / 2
-      const targetCamY = player.y - canvas.height / 2
-      
-      cameraRef.current.x += (targetCamX - cameraRef.current.x) * 0.1
-      cameraRef.current.y += (targetCamY - cameraRef.current.y) * 0.1
-      
-      cameraRef.current.x = Math.max(0, Math.min(cameraRef.current.x, mapWidth - canvas.width))
-      cameraRef.current.y = Math.max(0, Math.min(cameraRef.current.y, mapHeight - canvas.height))
-      
+
+      const zoom = player.hasCar ? 0.86 : 0.92
+      const viewW = canvas.width / zoom
+      const viewH = canvas.height / zoom
+
+      const vLen = Math.sqrt(player.vx * player.vx + player.vy * player.vy)
+      const lookAhead = player.hasCar ? 220 : 160
+      const laX = vLen > 0 ? (player.vx / vLen) * lookAhead : 0
+      const laY = vLen > 0 ? (player.vy / vLen) * lookAhead : 0
+
+      const targetCamX = player.x + laX - viewW / 2
+      const targetCamY = player.y + laY - viewH / 2
+
+      cameraRef.current.x += (targetCamX - cameraRef.current.x) * 0.12
+      cameraRef.current.y += (targetCamY - cameraRef.current.y) * 0.12
+
+      cameraRef.current.x = clamp(cameraRef.current.x, 0, Math.max(0, mapWidth - viewW))
+      cameraRef.current.y = clamp(cameraRef.current.y, 0, Math.max(0, mapHeight - viewH))
+
       const cam = cameraRef.current
-      
-      ctx.fillStyle = '#0d0d0d'
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.fillStyle = '#0a0b0d'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-      
+
+      ctx.setTransform(zoom, 0, 0, zoom, -cam.x * zoom, -cam.y * zoom)
+
       const startTileX = Math.floor(cam.x / TILE_SIZE)
       const startTileY = Math.floor(cam.y / TILE_SIZE)
-      const endTileX = Math.ceil((cam.x + canvas.width) / TILE_SIZE)
-      const endTileY = Math.ceil((cam.y + canvas.height) / TILE_SIZE)
-      
+      const endTileX = Math.ceil((cam.x + viewW) / TILE_SIZE)
+      const endTileY = Math.ceil((cam.y + viewH) / TILE_SIZE)
+
+      const isDriveable = (t) => t === 0 || t === 2 || t === 3
+
       for (let y = startTileY; y <= endTileY; y++) {
         for (let x = startTileX; x <= endTileX; x++) {
           if (y < 0 || y >= MAP_HEIGHT || x < 0 || x >= MAP_WIDTH) continue
@@ -300,108 +433,129 @@ function Mission({ contract, onComplete, onExit }) {
             const hasSprites = sprites?.buildings?.complete && sprites.buildings.naturalWidth > 0
             
             if (variant && hasSprites) {
-              drewSprite = getBuildingSprite(ctx, x, y, sprites, variant, cam.x, cam.y)
+              drewSprite = getBuildingSprite(ctx, x, y, sprites, variant, 0, 0)
             } else if (variant) {
               const colors = getBuildingVariantColor(variant)
               tileColor = colors.primary
               
-              // Draw windows
               const windowColor = colors.window || '#ffd700'
               const windowSize = 6
               const windowGap = 12
-              const offsetX = (x * TILE_SIZE - cam.x) + 8
-              const offsetY = (y * TILE_SIZE - cam.y) + 10
+              const offsetX = (x * TILE_SIZE) + 8
+              const offsetY = (y * TILE_SIZE) + 10
               
               ctx.fillStyle = windowColor
               for (let wy = 0; wy < 2; wy++) {
                 for (let wx = 0; wx < 2; wx++) {
-                  if (Math.random() > 0.3) {
-                    ctx.globalAlpha = 0.7
+                  if (hash01(x * 10 + wx, y * 10 + wy, map.seed || 1) > 0.28) {
+                    ctx.globalAlpha = 0.72
                     ctx.fillRect(offsetX + wx * windowGap, offsetY + wy * windowGap, windowSize, windowSize)
                     ctx.globalAlpha = 1
                   }
                 }
               }
               
-              // Draw roof accent
               ctx.fillStyle = colors.roof || colors.accent
-              ctx.fillRect(x * TILE_SIZE - cam.x, y * TILE_SIZE - cam.y, TILE_SIZE, 4)
+              ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, 4)
             }
           }
           
           if (!drewSprite) {
-            ctx.fillStyle = tileColor
-            ctx.fillRect(x * TILE_SIZE - cam.x, y * TILE_SIZE - cam.y, TILE_SIZE, TILE_SIZE)
+            if (tileType === 0 || tileType === 2 || tileType === 3) {
+              const v = hash01(x, y, map.seed || 1) * 20 - 10
+              const shade = Math.floor(74 + v)
+              ctx.fillStyle = `rgb(${shade},${shade},${shade})`
+              ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+
+              const left = x > 0 ? isDriveable(map.tiles[y][x - 1]) : false
+              const right = x < MAP_WIDTH - 1 ? isDriveable(map.tiles[y][x + 1]) : false
+              const up = y > 0 ? isDriveable(map.tiles[y - 1][x]) : false
+              const down = y < MAP_HEIGHT - 1 ? isDriveable(map.tiles[y + 1][x]) : false
+
+              ctx.globalAlpha = 0.18
+              ctx.strokeStyle = '#000000'
+              ctx.lineWidth = 2
+              ctx.strokeRect(x * TILE_SIZE + 1, y * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2)
+              ctx.globalAlpha = 1
+
+              if ((left || right) && !(up || down)) {
+                ctx.globalAlpha = 0.42
+                ctx.fillStyle = '#d9bf5a'
+                const yMid = y * TILE_SIZE + TILE_SIZE / 2 - 1
+                for (let i = 0; i < 3; i++) {
+                  ctx.fillRect(x * TILE_SIZE + 6 + i * 12, yMid, 6, 2)
+                }
+                ctx.globalAlpha = 1
+              } else if ((up || down) && !(left || right)) {
+                ctx.globalAlpha = 0.42
+                ctx.fillStyle = '#d9bf5a'
+                const xMid = x * TILE_SIZE + TILE_SIZE / 2 - 1
+                for (let i = 0; i < 3; i++) {
+                  ctx.fillRect(xMid, y * TILE_SIZE + 6 + i * 12, 2, 6)
+                }
+                ctx.globalAlpha = 1
+              }
+            } else {
+              ctx.fillStyle = tileColor
+              ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            }
           }
           
           if (tileType === 0) {
             ctx.strokeStyle = '#333333'
             ctx.lineWidth = 1
-            ctx.strokeRect(x * TILE_SIZE - cam.x, y * TILE_SIZE - cam.y, TILE_SIZE, TILE_SIZE)
+            ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
           }
         }
       }
       
       if (!player.hasCar && targetCar.exists) {
-        ctx.fillStyle = '#ff6b35'
-        ctx.beginPath()
-        ctx.arc(targetCar.x - cam.x, targetCar.y - cam.y, 15, 0, Math.PI * 2)
-        ctx.fill()
-        
-        ctx.fillStyle = '#0d0d0d'
-        ctx.font = 'bold 12px sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText(carEmoji, targetCar.x - cam.x, targetCar.y - cam.y + 4)
+        const pulse = 0.5 + 0.5 * Math.sin(now / 220)
+        drawCar(ctx, targetCar.x, targetCar.y, Math.PI / 2, '#ff6b35', now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })
       }
       
       if (player.hasCar) {
+        const pulse = 0.5 + 0.5 * Math.sin(now / 180)
+        ctx.save()
+        ctx.globalAlpha = 0.22 + pulse * 0.25
         ctx.fillStyle = '#4ade80'
         ctx.beginPath()
-        ctx.arc(delivery.x - cam.x, delivery.y - cam.y, 30, 0, Math.PI * 2)
+        ctx.arc(delivery.x, delivery.y, 54, 0, Math.PI * 2)
         ctx.fill()
-        
-        ctx.fillStyle = '#0d0d0d'
-        ctx.font = 'bold 14px sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText('✓', delivery.x - cam.x, delivery.y - cam.y + 5)
+        ctx.globalAlpha = 0.9
+        ctx.strokeStyle = '#4ade80'
+        ctx.lineWidth = 3
+        ctx.setLineDash([10, 8])
+        ctx.beginPath()
+        ctx.arc(delivery.x, delivery.y, 54, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.restore()
       }
       
       police.forEach(cop => {
-        ctx.fillStyle = '#3b82f6'
-        ctx.beginPath()
-        ctx.moveTo(cop.x - cam.x, cop.y - 12 - cam.y)
-        ctx.lineTo(cop.x - cam.x + 10, cop.y - cam.y + 10)
-        ctx.lineTo(cop.x - cam.x - 10, cop.y - cam.y + 10)
-        ctx.closePath()
-        ctx.fill()
-        
-        if (Math.random() > 0.5) {
-          ctx.fillStyle = '#ff3b3b'
-          ctx.beginPath()
-          ctx.arc(cop.x - cam.x - 5, cop.y - cam.y - 3, 3, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.beginPath()
-          ctx.arc(cop.x - cam.x + 5, cop.y - cam.y - 3, 3, 0, Math.PI * 2)
-          ctx.fill()
-        }
+        drawCar(ctx, cop.x, cop.y, cop.angle ?? 0, '#2b6fff', now, { siren: true, w: 26, h: 15 })
       })
       
-      ctx.fillStyle = player.hasCar ? '#ff6b35' : '#4ade80'
-      ctx.beginPath()
-      ctx.arc(player.x - cam.x, player.y - cam.y, player.hasCar ? 18 : 12, 0, Math.PI * 2)
-      ctx.fill()
-      
       if (player.hasCar) {
-        ctx.fillStyle = '#0d0d0d'
-        ctx.font = 'bold 14px sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText(carEmoji, player.x - cam.x, player.y - cam.y + 5)
+        drawCar(ctx, player.x, player.y, player.angle, '#ff6b35', now, { w: 30, h: 16 })
       } else {
-        ctx.fillStyle = '#0d0d0d'
-        ctx.font = 'bold 12px sans-serif'
-        ctx.textAlign = 'center'
-        ctx.fillText('👤', player.x - cam.x, player.y - cam.y + 4)
+        drawPed(ctx, player.x, player.y, player.angle, now, { color: '#4ade80', highlight: '#ff6b35' })
       }
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      const vg = ctx.createRadialGradient(
+        canvas.width / 2,
+        canvas.height / 2,
+        Math.min(canvas.width, canvas.height) * 0.2,
+        canvas.width / 2,
+        canvas.height / 2,
+        Math.max(canvas.width, canvas.height) * 0.7
+      )
+      vg.addColorStop(0, 'rgba(0,0,0,0)')
+      vg.addColorStop(1, 'rgba(0,0,0,0.42)')
+      ctx.fillStyle = vg
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
       
       const minimapCanvas = minimapRef.current
       if (minimapCanvas) {
@@ -514,6 +668,7 @@ function Mission({ contract, onComplete, onExit }) {
   
   const handleMiniGameResult = useCallback((success) => {
     setShowMiniGame(false)
+    showMiniGameRef.current = false
     const now = Date.now()
     
     if (success) {

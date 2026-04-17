@@ -157,8 +157,6 @@ export const getBuildingSprite = (ctx, x, y, spriteSheets, variant, camX = 0, ca
   if (!spriteSheets?.buildings) return null
   if (!spriteSheets.buildings.complete || spriteSheets.buildings.naturalWidth === 0) return null
   
-  console.log('[DrawSprite] Drawing at', x, y, 'variant:', variant, 'cam:', camX, camY)
-  
   const spriteIndex = {
     [BUILDING_VARIANTS.RESIDENTIAL]: 0,
     [BUILDING_VARIANTS.COMMERCIAL]: 1,
@@ -260,8 +258,6 @@ export const loadMapFromJson = async (jsonUrl) => {
     const targetCarSpawn = spawns[1] || { x: mapWidth - 3, y: mapHeight - 3 }
     const deliverySpawn = spawns[2] || { x: 2, y: mapHeight - 3 }
     
-    console.log('[MapSystem] Loaded map:', mapWidth, 'x', mapHeight)
-    
     return {
       tiles,
       buildingTypes,
@@ -281,10 +277,11 @@ export const loadMapFromJson = async (jsonUrl) => {
 
 export const generateMap = (seed = 1) => {
   const cityData = generateCity(MAP_WIDTH, MAP_HEIGHT, seed)
+  const rand = mulberry32(seed ^ 0x9e3779b9)
   
   const getRandomVariant = () => {
     const variants = Object.values(BUILDING_VARIANTS)
-    return variants[Math.floor(Math.random() * variants.length)]
+    return variants[Math.floor(rand() * variants.length)]
   }
   
   const tiles = []
@@ -317,6 +314,7 @@ export const generateMap = (seed = 1) => {
   const spawns = cityData.spawns || []
   
   return {
+    seed,
     tiles,
     buildingTypes,
     spawnPoints: {
