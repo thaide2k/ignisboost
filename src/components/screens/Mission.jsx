@@ -146,28 +146,57 @@ const drawRoadStamp = (ctx, sheet, stamp, x, y, seed = 1) => {
   ctx.translate(destX + destW / 2, destY + destH / 2)
   ctx.rotate(stamp.rot || 0)
 
+  const open = Array.isArray(stamp.open) ? stamp.open : null
+  const has = (k) => (open ? open.includes(k) : false)
+
+  ctx.globalAlpha = 0.65
+  ctx.fillStyle = '#d9bf5a'
+  const dashLen = 8
+  const dashTh = 2
+  const edgePad = 10
+  const centerGap = 12
+
+  const drawArm = (side) => {
+    if (side === 'N') {
+      for (let yy = -destH / 2 + edgePad; yy <= -centerGap - dashLen; yy += 14) {
+        ctx.fillRect(-dashTh / 2, yy, dashTh, dashLen)
+      }
+    } else if (side === 'S') {
+      for (let yy = centerGap; yy <= destH / 2 - edgePad - dashLen; yy += 14) {
+        ctx.fillRect(-dashTh / 2, yy, dashTh, dashLen)
+      }
+    } else if (side === 'W') {
+      for (let xx = -destW / 2 + edgePad; xx <= -centerGap - dashLen; xx += 14) {
+        ctx.fillRect(xx, -dashTh / 2, dashLen, dashTh)
+      }
+    } else if (side === 'E') {
+      for (let xx = centerGap; xx <= destW / 2 - edgePad - dashLen; xx += 14) {
+        ctx.fillRect(xx, -dashTh / 2, dashLen, dashTh)
+      }
+    }
+  }
+
+  if (open) {
+    if (has('N')) drawArm('N')
+    if (has('S')) drawArm('S')
+    if (has('W')) drawArm('W')
+    if (has('E')) drawArm('E')
+  }
+  ctx.globalAlpha = 1
+
   if (stamp.kind === 'CROSS') {
-    ctx.globalAlpha = 0.85
+    ctx.globalAlpha = 0.55
     ctx.fillStyle = '#e5e7eb'
     const stripeW = 6
     const stripeH = 3
-    const pad = 10
-    for (let i = 0; i < 6; i++) {
-      const ox = -destW / 2 + pad + i * (stripeW + 4)
+    const pad = 12
+    for (let i = 0; i < 5; i++) {
+      const ox = -destW / 2 + pad + i * (stripeW + 5)
       ctx.fillRect(ox, -destH / 2 + 8, stripeW, stripeH)
       ctx.fillRect(ox, destH / 2 - 12, stripeW, stripeH)
-      const oy = -destH / 2 + pad + i * (stripeW + 4)
+      const oy = -destH / 2 + pad + i * (stripeW + 5)
       ctx.fillRect(-destW / 2 + 8, oy, stripeH, stripeW)
       ctx.fillRect(destW / 2 - 12, oy, stripeH, stripeW)
-    }
-    ctx.globalAlpha = 1
-  } else if (stamp.kind === 'STRAIGHT' || stamp.kind === 'TJUNC' || stamp.kind === 'DEAD') {
-    ctx.globalAlpha = 0.65
-    ctx.fillStyle = '#d9bf5a'
-    const dashW = 6
-    const dashH = 2
-    for (let i = 0; i < 5; i++) {
-      ctx.fillRect(-dashH / 2, -destH / 2 + 12 + i * 14, dashH, dashW)
     }
     ctx.globalAlpha = 1
   }

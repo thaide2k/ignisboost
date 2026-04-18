@@ -401,7 +401,7 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
     )
   }
 
-  const choose = (kind, frameKey, rot = 0, mask = null) => {
+  const choose = (kind, frameKey, rot = 0, mask = null, open = null) => {
     const f = STREETS2_FRAMES[frameKey] || STREETS2_FRAMES.STRAIGHT
     return {
       sheet: 'streets2',
@@ -413,7 +413,8 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
       spanX: 2,
       spanY: 2,
       rot,
-      mask
+      mask,
+      open
     }
   }
 
@@ -430,7 +431,7 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
 
       let stamp = null
       if (count === 4) {
-        stamp = choose('CROSS', 'CROSS', 0)
+        stamp = choose('CROSS', 'CROSS', 0, null, ['N', 'E', 'S', 'W'])
       } else if (count === 3) {
         const missingN = !n
         const missingE = !e
@@ -443,25 +444,25 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
           missingN ? Math.PI :
           Math.PI * 1.5
 
-        stamp = choose('TJUNC', 'CROSS', rot, ['S'])
+        stamp = choose('TJUNC', 'CROSS', rot, ['S'], ['N', 'E', 'W'])
       } else if (count === 2) {
         const straight = (n && s) || (e && w)
         if (straight) {
           const rot = (e && w) ? Math.PI / 2 : 0
-          stamp = choose('STRAIGHT', 'STRAIGHT', rot)
+          stamp = choose('STRAIGHT', 'STRAIGHT', rot, null, ['N', 'S'])
         } else {
           const rot =
-            (s && w) ? 0 :
-            (w && n) ? Math.PI / 2 :
-            (n && e) ? Math.PI :
+            (n && e) ? 0 :
+            (e && s) ? Math.PI / 2 :
+            (s && w) ? Math.PI :
             Math.PI * 1.5
-          stamp = choose('TURN', 'TURN', rot)
+          stamp = choose('TURN', 'TURN', rot, null, ['N', 'E'])
         }
       } else if (count === 1) {
         const rot = n ? 0 : e ? Math.PI / 2 : s ? Math.PI : Math.PI * 1.5
-        stamp = choose('DEAD', 'CROSS', rot, ['E', 'S', 'W'])
+        stamp = choose('DEAD', 'CROSS', rot, ['E', 'S', 'W'], ['N'])
       } else {
-        stamp = choose('STRAIGHT', 'STRAIGHT', 0)
+        stamp = choose('STRAIGHT', 'STRAIGHT', 0, null, ['N', 'S'])
       }
 
       const x = mx * 2
