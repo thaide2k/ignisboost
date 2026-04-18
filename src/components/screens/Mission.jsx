@@ -118,7 +118,7 @@ const drawPed = (ctx, x, y, angle, now, opts = {}) => {
   ctx.restore()
 }
 
-const drawRoadStamp = (ctx, sheet, stamp, x, y) => {
+const drawRoadStamp = (ctx, sheet, stamp, x, y, seed = 1) => {
   if (!sheet?.complete || sheet.naturalWidth === 0) return false
   if (!stamp) return false
 
@@ -127,18 +127,65 @@ const drawRoadStamp = (ctx, sheet, stamp, x, y) => {
   const destW = (stamp.spanX || 2) * TILE_SIZE
   const destH = (stamp.spanY || 2) * TILE_SIZE
 
+  const v = hash01(x, y, seed) * 18 - 9
+  const shade = Math.floor(62 + v)
+
   ctx.save()
-  ctx.fillStyle = '#4b4b4b'
+  ctx.fillStyle = `rgb(${shade},${shade},${shade})`
   ctx.fillRect(destX, destY, destW, destH)
+
+  ctx.globalAlpha = 0.25
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'
+  for (let i = 0; i < 10; i++) {
+    const px = destX + ((i * 19 + (seed % 11)) % destW)
+    const py = destY + ((i * 23 + (seed % 17)) % destH)
+    ctx.fillRect(px, py, 2, 2)
+  }
+  ctx.globalAlpha = 1
+
   ctx.translate(destX + destW / 2, destY + destH / 2)
   ctx.rotate(stamp.rot || 0)
-  ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
+
+  if (stamp.kind === 'CROSS') {
+    ctx.globalAlpha = 0.9
+    ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
+    ctx.globalAlpha = 1
+
+    ctx.globalAlpha = 0.85
+    ctx.fillStyle = '#e5e7eb'
+    const stripeW = 6
+    const stripeH = 3
+    const pad = 10
+    for (let i = 0; i < 6; i++) {
+      const ox = -destW / 2 + pad + i * (stripeW + 4)
+      ctx.fillRect(ox, -destH / 2 + 8, stripeW, stripeH)
+      ctx.fillRect(ox, destH / 2 - 12, stripeW, stripeH)
+      const oy = -destH / 2 + pad + i * (stripeW + 4)
+      ctx.fillRect(-destW / 2 + 8, oy, stripeH, stripeW)
+      ctx.fillRect(destW / 2 - 12, oy, stripeH, stripeW)
+    }
+    ctx.globalAlpha = 1
+  } else if (stamp.kind === 'TURN') {
+    ctx.globalAlpha = 0.8
+    ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
+    ctx.globalAlpha = 1
+  } else {
+    ctx.globalAlpha = 0.65
+    ctx.fillStyle = '#d9bf5a'
+    const dashW = 6
+    const dashH = 2
+    for (let i = 0; i < 5; i++) {
+      ctx.fillRect(-dashH / 2, -destH / 2 + 12 + i * 14, dashH, dashW)
+    }
+    ctx.globalAlpha = 1
+  }
+
   if (Array.isArray(stamp.mask) && stamp.mask.length) {
     const halfW = destW / 2
     const halfH = destH / 2
     const armW = Math.floor(destW * 0.34)
     const armHalf = armW / 2
-    ctx.fillStyle = '#4b4b4b'
+    ctx.fillStyle = `rgb(${shade},${shade},${shade})`
     for (const side of stamp.mask) {
       if (side === 'N') ctx.fillRect(-armHalf, -halfH, armW, halfH)
       else if (side === 'S') ctx.fillRect(-armHalf, 0, armW, halfH)
@@ -460,6 +507,7 @@ function Mission({ contract, onComplete, onExit }) {
           const tileType = map.tiles[y][x]
           let tileColor = getTileColor(tileType)
           let drewSprite = false
+          let buildingDeco = null
           
           if (tileType === 1 && map.buildingTypes && map.buildingTypes[y]) {
             const variant = map.buildingTypes[y][x]
@@ -472,25 +520,10 @@ function Mission({ contract, onComplete, onExit }) {
               const colors = getBuildingVariantColor(variant)
               tileColor = colors.primary
               
-              const windowColor = colors.window || '#ffd700'
-              const windowSize = 6
-              const windowGap = 12
-              const offsetX = (x * TILE_SIZE) + 8
-              const offsetY = (y * TILE_SIZE) + 10
-              
-              ctx.fillStyle = windowColor
-              for (let wy = 0; wy < 2; wy++) {
-                for (let wx = 0; wx < 2; wx++) {
-                  if (hash01(x * 10 + wx, y * 10 + wy, map.seed || 1) > 0.28) {
-                    ctx.globalAlpha = 0.72
-                    ctx.fillRect(offsetX + wx * windowGap, offsetY + wy * windowGap, windowSize, windowSize)
-                    ctx.globalAlpha = 1
-                  }
-                }
+              buildingDeco = {
+                windowColor: colors.window || '#ffd700',
+                roofColor: colors.roof || colors.accent
               }
-              
-              ctx.fillStyle = colors.roof || colors.accent
-              ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, 4)
             }
           }
           
@@ -505,7 +538,7 @@ function Mission({ contract, onComplete, onExit }) {
 
                 if (!drawnRoadStamps.has(k)) {
                   const anchorInfo = map.roadStampIndex?.[ay]?.[ax]
-                  drewSprite = drawRoadStamp(ctx, sprites?.streets2, anchorInfo?.stamp, ax, ay)
+                  drewSprite = drawRoadStamp(ctx, sprites?.streets2, anchorInfo?.stamp, ax, ay, map.seed || 1)
                   if (!drewSprite) {
                     const v = hash01(ax, ay, map.seed || 1) * 18 - 10
                     const shade = Math.floor(74 + v)
@@ -555,6 +588,47 @@ function Mission({ contract, onComplete, onExit }) {
             } else {
               ctx.fillStyle = tileColor
               ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+
+              if (tileType === 1) {
+                if (buildingDeco) {
+                  const offsetX = (x * TILE_SIZE) + 8
+                  const offsetY = (y * TILE_SIZE) + 10
+                  const windowSize = 6
+                  const windowGap = 12
+                  ctx.fillStyle = buildingDeco.windowColor
+                  for (let wy = 0; wy < 2; wy++) {
+                    for (let wx = 0; wx < 2; wx++) {
+                      if (hash01(x * 10 + wx, y * 10 + wy, map.seed || 1) > 0.28) {
+                        ctx.globalAlpha = 0.7
+                        ctx.fillRect(offsetX + wx * windowGap, offsetY + wy * windowGap, windowSize, windowSize)
+                        ctx.globalAlpha = 1
+                      }
+                    }
+                  }
+                  ctx.fillStyle = buildingDeco.roofColor
+                  ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, 4)
+                }
+
+                const curbW = 4
+                const px = x * TILE_SIZE
+                const py = y * TILE_SIZE
+                const leftRoad = x > 0 && map.tiles[y][x - 1] === 0
+                const rightRoad = x < MAP_WIDTH - 1 && map.tiles[y][x + 1] === 0
+                const upRoad = y > 0 && map.tiles[y - 1][x] === 0
+                const downRoad = y < MAP_HEIGHT - 1 && map.tiles[y + 1][x] === 0
+
+                ctx.fillStyle = 'rgba(220,220,220,0.38)'
+                if (leftRoad) ctx.fillRect(px, py, curbW, TILE_SIZE)
+                if (rightRoad) ctx.fillRect(px + TILE_SIZE - curbW, py, curbW, TILE_SIZE)
+                if (upRoad) ctx.fillRect(px, py, TILE_SIZE, curbW)
+                if (downRoad) ctx.fillRect(px, py + TILE_SIZE - curbW, TILE_SIZE, curbW)
+
+                ctx.fillStyle = 'rgba(0,0,0,0.25)'
+                if (leftRoad) ctx.fillRect(px + curbW, py, 1, TILE_SIZE)
+                if (rightRoad) ctx.fillRect(px + TILE_SIZE - curbW - 1, py, 1, TILE_SIZE)
+                if (upRoad) ctx.fillRect(px, py + curbW, TILE_SIZE, 1)
+                if (downRoad) ctx.fillRect(px, py + TILE_SIZE - curbW - 1, TILE_SIZE, 1)
+              }
             }
           }
           

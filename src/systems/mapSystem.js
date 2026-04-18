@@ -280,28 +280,28 @@ export const getBuildingSprite = (ctx, x, y, spriteSheets, variant, camX = 0, ca
 export const getBuildingVariantColor = (variant) => {
   const colors = {
     [BUILDING_VARIANTS.RESIDENTIAL]: {
-      primary: '#2a2a4e',
-      accent: '#4a4a8e',
+      primary: '#1f2430',
+      accent: '#2b3344',
       window: '#ffd700',
-      roof: '#3a3a6e'
+      roof: '#2a3140'
     },
     [BUILDING_VARIANTS.COMMERCIAL]: {
-      primary: '#1a3a4e',
-      accent: '#2a5a7e',
+      primary: '#202a33',
+      accent: '#2e3a46',
       window: '#00ff88',
-      roof: '#2a4a6e'
+      roof: '#2b3642'
     },
     [BUILDING_VARIANTS.INDUSTRIAL]: {
-      primary: '#2e2e2e',
-      accent: '#4e4e4e',
+      primary: '#272a2c',
+      accent: '#3a3f44',
       window: '#ff6b35',
-      roof: '#3e3e3e'
+      roof: '#2f3337'
     },
     [BUILDING_VARIANTS.OFFICE]: {
-      primary: '#1e3a5e',
-      accent: '#3a5a8e',
+      primary: '#1e2733',
+      accent: '#2d3a49',
       window: '#00ffff',
-      roof: '#2a4a7e'
+      roof: '#2a3442'
     }
   }
   return colors[variant] || colors[BUILDING_VARIANTS.RESIDENTIAL]
@@ -405,6 +405,7 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
     const f = STREETS2_FRAMES[frameKey] || STREETS2_FRAMES.STRAIGHT
     return {
       sheet: 'streets2',
+      kind: frameKey,
       sx: STREETS2_PAD + f.col * STREETS2_STEP,
       sy: STREETS2_PAD + f.row * STREETS2_STEP,
       sw: STREETS2_CELL,
@@ -483,11 +484,18 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
 
 export const generateMap = (seed = 1) => {
   const cityData = generateCity(MAP_WIDTH, MAP_HEIGHT, seed)
-  const rand = mulberry32(seed ^ 0x9e3779b9)
-  
-  const getRandomVariant = () => {
-    const variants = Object.values(BUILDING_VARIANTS)
-    return variants[Math.floor(rand() * variants.length)]
+  const variants = Object.values(BUILDING_VARIANTS)
+  const hash01 = (x, y, s = 1) => {
+    let t = (x * 374761393 + y * 668265263 + s * 1442695041) | 0
+    t = (t ^ (t >>> 13)) | 0
+    t = Math.imul(t, 1274126177)
+    return (((t >>> 0) & 0xffffff) / 0x1000000)
+  }
+  const getVariantAt = (x, y) => {
+    const gx = x >> 2
+    const gy = y >> 2
+    const i = Math.floor(hash01(gx, gy, seed ^ 0x9e3779b9) * variants.length)
+    return variants[Math.max(0, Math.min(variants.length - 1, i))]
   }
   
   const tiles = []
@@ -513,7 +521,7 @@ export const generateMap = (seed = 1) => {
         typeRow.push(null)
       } else if (tileValue === TILE_TYPES.BUILDING || tileValue === MAP_TILE_VALUES.BUILDING) {
         row.push(TILE_TYPES.BUILDING)
-        typeRow.push(getRandomVariant())
+        typeRow.push(getVariantAt(x, y))
       } else {
         row.push(TILE_TYPES.BUILDING)
         typeRow.push(BUILDING_VARIANTS.RESIDENTIAL)
