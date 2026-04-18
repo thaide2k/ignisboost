@@ -161,7 +161,7 @@ export const generateCity = (width = 60, height = 60, seed = 1) => {
 
   const spawns = []
   const minDistance = 10
-  const isDriveable = (t) => t === TILE_TYPES.ROAD || t === TILE_TYPES.PARKING || t === TILE_TYPES.ALLEY
+  const isDriveable = (t) => t === TILE_TYPES.ROAD
   const isValidSpawn = (x, y) => {
     if (!tiles[y] || !isDriveable(tiles[y][x])) return false
     for (const spawn of spawns) {
@@ -189,6 +189,36 @@ export const generateCity = (width = 60, height = 60, seed = 1) => {
   }
 
   return { width, height, tiles, collision: 'derive_from_tiles', spawns }
+}
+
+const findNearestTile = (tiles, width, height, start, predicate, maxRadius = 30) => {
+  const sx = Math.max(0, Math.min(width - 1, start.x | 0))
+  const sy = Math.max(0, Math.min(height - 1, start.y | 0))
+  if (predicate(tiles[sy][sx])) return { x: sx, y: sy }
+
+  for (let r = 1; r <= maxRadius; r++) {
+    const x0 = Math.max(0, sx - r)
+    const x1 = Math.min(width - 1, sx + r)
+    const y0 = Math.max(0, sy - r)
+    const y1 = Math.min(height - 1, sy + r)
+
+    for (let x = x0; x <= x1; x++) {
+      if (predicate(tiles[y0][x])) return { x, y: y0 }
+      if (predicate(tiles[y1][x])) return { x, y: y1 }
+    }
+    for (let y = y0 + 1; y <= y1 - 1; y++) {
+      if (predicate(tiles[y][x0])) return { x: x0, y }
+      if (predicate(tiles[y][x1])) return { x: x1, y }
+    }
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (predicate(tiles[y][x])) return { x, y }
+    }
+  }
+
+  return { x: sx, y: sy }
 }
 
 export const BUILDING_VARIANTS = {
@@ -495,6 +525,10 @@ export const generateMap = (seed = 1) => {
   }
   
   const spawns = cityData.spawns || []
+  const isRoad = (t) => t === TILE_TYPES.ROAD
+  const playerSpawn = (spawns[0] && isRoad(tiles[spawns[0].y]?.[spawns[0].x])) ? spawns[0] : findNearestTile(tiles, cityData.width, cityData.height, spawns[0] || { x: 2, y: 2 }, isRoad)
+  const targetSpawn = (spawns[1] && isRoad(tiles[spawns[1].y]?.[spawns[1].x])) ? spawns[1] : findNearestTile(tiles, cityData.width, cityData.height, spawns[1] || { x: MAP_WIDTH - 3, y: MAP_HEIGHT - 3 }, isRoad)
+  const deliverySpawn = (spawns[2] && isRoad(tiles[spawns[2].y]?.[spawns[2].x])) ? spawns[2] : findNearestTile(tiles, cityData.width, cityData.height, spawns[2] || { x: 2, y: MAP_HEIGHT - 3 }, isRoad)
   const roadStampIndex = createRoadStampIndex(tiles, cityData.width, cityData.height, seed)
   
   return {
@@ -503,9 +537,9 @@ export const generateMap = (seed = 1) => {
     buildingTypes,
     roadStampIndex,
     spawnPoints: {
-      player: spawns[0] || { x: 2, y: 2 },
-      targetCar: spawns[1] || { x: MAP_WIDTH - 3, y: MAP_HEIGHT - 3 },
-      delivery: spawns[2] || { x: 2, y: MAP_HEIGHT - 3 }
+      player: playerSpawn,
+      targetCar: targetSpawn,
+      delivery: deliverySpawn
     },
     width: cityData.width,
     height: cityData.height

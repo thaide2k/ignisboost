@@ -341,7 +341,7 @@ function Mission({ contract, onComplete, onExit }) {
             
             if (spawnTileX >= 0 && spawnTileX < map.width && spawnTileY >= 0 && spawnTileY < map.height) {
               const tile = map.tiles[spawnTileY][spawnTileX]
-              if (tile === 0 || tile === 2 || tile === 3) {
+              if (tile === 0) {
                 found = true
               }
             }
@@ -349,8 +349,8 @@ function Mission({ contract, onComplete, onExit }) {
           
           if (found) {
             police.push({
-              x: spawnTileX * 40 + 20,
-              y: spawnTileY * 40 + 20,
+              x: spawnTileX * TILE_SIZE + TILE_SIZE / 2,
+              y: spawnTileY * TILE_SIZE + TILE_SIZE / 2,
               speed: 0.4 + heat * 0.06
             })
             
