@@ -401,11 +401,11 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
     )
   }
 
-  const choose = (frameKey, rot = 0, mask = null) => {
+  const choose = (kind, frameKey, rot = 0, mask = null) => {
     const f = STREETS2_FRAMES[frameKey] || STREETS2_FRAMES.STRAIGHT
     return {
       sheet: 'streets2',
-      kind: frameKey,
+      kind,
       sx: STREETS2_PAD + f.col * STREETS2_STEP,
       sy: STREETS2_PAD + f.row * STREETS2_STEP,
       sw: STREETS2_CELL,
@@ -430,7 +430,7 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
 
       let stamp = null
       if (count === 4) {
-        stamp = choose('CROSS', 0)
+        stamp = choose('CROSS', 'CROSS', 0)
       } else if (count === 3) {
         const missingN = !n
         const missingE = !e
@@ -443,25 +443,25 @@ const createRoadStampIndex = (tiles, width, height, seed = 1) => {
           missingN ? Math.PI :
           Math.PI * 1.5
 
-        stamp = choose('CROSS', rot, ['S'])
+        stamp = choose('TJUNC', 'CROSS', rot, ['S'])
       } else if (count === 2) {
         const straight = (n && s) || (e && w)
         if (straight) {
           const rot = (e && w) ? Math.PI / 2 : 0
-          stamp = choose('STRAIGHT', rot)
+          stamp = choose('STRAIGHT', 'STRAIGHT', rot)
         } else {
           const rot =
             (s && w) ? 0 :
             (w && n) ? Math.PI / 2 :
             (n && e) ? Math.PI :
             Math.PI * 1.5
-          stamp = choose('TURN', rot)
+          stamp = choose('TURN', 'TURN', rot)
         }
       } else if (count === 1) {
         const rot = n ? 0 : e ? Math.PI / 2 : s ? Math.PI : Math.PI * 1.5
-        stamp = choose('CROSS', rot, ['E', 'S', 'W'])
+        stamp = choose('DEAD', 'CROSS', rot, ['E', 'S', 'W'])
       } else {
-        stamp = choose('STRAIGHT', 0)
+        stamp = choose('STRAIGHT', 'STRAIGHT', 0)
       }
 
       const x = mx * 2

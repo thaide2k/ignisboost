@@ -147,10 +147,6 @@ const drawRoadStamp = (ctx, sheet, stamp, x, y, seed = 1) => {
   ctx.rotate(stamp.rot || 0)
 
   if (stamp.kind === 'CROSS') {
-    ctx.globalAlpha = 0.9
-    ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
-    ctx.globalAlpha = 1
-
     ctx.globalAlpha = 0.85
     ctx.fillStyle = '#e5e7eb'
     const stripeW = 6
@@ -165,11 +161,7 @@ const drawRoadStamp = (ctx, sheet, stamp, x, y, seed = 1) => {
       ctx.fillRect(destW / 2 - 12, oy, stripeH, stripeW)
     }
     ctx.globalAlpha = 1
-  } else if (stamp.kind === 'TURN') {
-    ctx.globalAlpha = 0.8
-    ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
-    ctx.globalAlpha = 1
-  } else {
+  } else if (stamp.kind === 'STRAIGHT' || stamp.kind === 'TJUNC' || stamp.kind === 'DEAD') {
     ctx.globalAlpha = 0.65
     ctx.fillStyle = '#d9bf5a'
     const dashW = 6
