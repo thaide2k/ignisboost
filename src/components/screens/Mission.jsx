@@ -399,8 +399,9 @@ function Mission({ contract, onComplete, onExit }) {
       const delivery = deliveryRef.current
       const police = policeRef.current
       
-      const zoom = player.hasCar ? 0.86 : 0.92
-      const speedScale = 1 / zoom
+      const zoomBase = player.hasCar ? 0.86 : 0.92
+      const zoom = zoomBase * 2
+      const speedScale = 1 / zoomBase
       const baseSpeed = (player.hasCar ? 1.55 : 0.9) * movementSpeedMultRef.current
       const speed = baseSpeed * speedScale * dtFactor
       
