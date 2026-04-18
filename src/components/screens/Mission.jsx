@@ -99,7 +99,7 @@ const drawVehicleSprite = (ctx, x, y, angle, sprite, now, opts = {}) => {
   const img = dirs[idx]
   if (!img) return false
 
-  const size = opts.size ?? 34
+  const size = opts.size ?? 68
   const r = size / 2
 
   ctx.save()
@@ -735,13 +735,13 @@ function Mission({ contract, onComplete, onExit }) {
       }
       
       police.forEach(cop => {
-        if (!drawVehicleSprite(ctx, cop.x, cop.y, cop.angle ?? 0, sprites?.vehicles?.police, now, { size: 34 })) {
+        if (!drawVehicleSprite(ctx, cop.x, cop.y, cop.angle ?? 0, sprites?.vehicles?.police, now, { size: 68 })) {
           drawCar(ctx, cop.x, cop.y, cop.angle ?? 0, '#2b6fff', now, { siren: true, w: 26, h: 15 })
         }
       })
       
       if (player.hasCar) {
-        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, sprites?.vehicles?.player, now, { size: 34 })) {
+        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, sprites?.vehicles?.player, now, { size: 68 })) {
           drawCar(ctx, player.x, player.y, player.angle, '#ff6b35', now, { w: 30, h: 16 })
         }
       } else {
