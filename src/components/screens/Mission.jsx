@@ -30,30 +30,6 @@ const roundRect = (ctx, x, y, w, h, r) => {
   ctx.closePath()
 }
 
-const STREET_PAD = 16
-const STREET_CELL = 80
-const STREET_STEP = 96
-const STREET_SAFE_FRAMES = [
-  [0, 0],
-  [1, 0],
-  [0, 1],
-  [1, 1]
-]
-
-const drawStreetSprite = (ctx, sheet, x, y, seed = 1) => {
-  if (!sheet?.complete || sheet.naturalWidth === 0) return false
-  const idx = Math.floor(hash01(x, y, seed) * STREET_SAFE_FRAMES.length)
-  const [col, row] = STREET_SAFE_FRAMES[idx] || STREET_SAFE_FRAMES[0]
-  const sx = STREET_PAD + col * STREET_STEP
-  const sy = STREET_PAD + row * STREET_STEP
-  ctx.drawImage(
-    sheet,
-    sx, sy, STREET_CELL, STREET_CELL,
-    x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE
-  )
-  return true
-}
-
 const drawCar = (ctx, x, y, angle, color, now, opts = {}) => {
   const w = opts.w ?? 28
   const h = opts.h ?? 16
@@ -140,6 +116,24 @@ const drawPed = (ctx, x, y, angle, now, opts = {}) => {
   }
 
   ctx.restore()
+}
+
+const drawRoadStamp = (ctx, sheet, stamp, x, y) => {
+  if (!sheet?.complete || sheet.naturalWidth === 0) return false
+  if (!stamp) return false
+
+  const destX = x * TILE_SIZE
+  const destY = y * TILE_SIZE
+  const destW = (stamp.spanX || 2) * TILE_SIZE
+  const destH = (stamp.spanY || 2) * TILE_SIZE
+
+  ctx.save()
+  ctx.translate(destX + destW / 2, destY + destH / 2)
+  ctx.rotate(stamp.rot || 0)
+  ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
+  ctx.restore()
+
+  return true
 }
 
 function Mission({ contract, onComplete, onExit }) {
@@ -266,7 +260,6 @@ function Mission({ contract, onComplete, onExit }) {
     
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    ctx.imageSmoothingEnabled = false
     
     const gameLoop = () => {
       const now = Date.now()
@@ -275,10 +268,7 @@ function Mission({ contract, onComplete, onExit }) {
       const delivery = deliveryRef.current
       const police = policeRef.current
       
-      const zoom = player.hasCar ? 0.86 : 0.92
-      const speedScale = 1 / zoom
-      const baseSpeed = player.hasCar ? 1.55 : 0.9
-      const speed = baseSpeed * speedScale
+      const speed = player.hasCar ? 1 : 0.8
       
       let dx = 0
       let dy = 0
@@ -371,10 +361,10 @@ function Mission({ contract, onComplete, onExit }) {
       
       police.forEach((cop, index) => {
         const behavior = getPoliceBehavior(cop, player, heat, map)
-        cop.x += behavior.vx * speedScale
-        cop.y += behavior.vy * speedScale
-        cop.vx = behavior.vx * speedScale
-        cop.vy = behavior.vy * speedScale
+        cop.x += behavior.vx
+        cop.y += behavior.vy
+        cop.vx = behavior.vx
+        cop.vy = behavior.vy
         if (cop.vx !== 0 || cop.vy !== 0) {
           cop.angle = Math.atan2(cop.vy, cop.vx)
         }
@@ -413,6 +403,7 @@ function Mission({ contract, onComplete, onExit }) {
       const mapWidth = MAP_WIDTH * TILE_SIZE
       const mapHeight = MAP_HEIGHT * TILE_SIZE
 
+      const zoom = player.hasCar ? 0.86 : 0.92
       const viewW = canvas.width / zoom
       const viewH = canvas.height / zoom
 
@@ -453,7 +444,6 @@ function Mission({ contract, onComplete, onExit }) {
           let tileColor = getTileColor(tileType)
           let drewSprite = false
           
-          // Use building variant colors for buildings (tileType 1)
           if (tileType === 1 && map.buildingTypes && map.buildingTypes[y]) {
             const variant = map.buildingTypes[y][x]
             
@@ -488,71 +478,50 @@ function Mission({ contract, onComplete, onExit }) {
           }
           
           if (!drewSprite) {
-            if (tileType === 0 || tileType === 2 || tileType === 3) {
-              const seed = map.seed || 1
-              const sheet = tileType === 0 ? sprites?.streets2 : sprites?.streets1
-              drewSprite = drawStreetSprite(ctx, sheet, x, y, seed)
+            if (tileType === 0) {
+              const stampInfo = map.roadStampIndex?.[y]?.[x]
+
+              if (stampInfo?.covered && !stampInfo.anchor) {
+                continue
+              }
+
+              if (stampInfo?.anchor) {
+                drewSprite = drawRoadStamp(ctx, sprites?.streets2, stampInfo.stamp, x, y)
+              }
 
               if (!drewSprite) {
-                const v = hash01(x, y, seed) * 20 - 10
+                const v = hash01(x, y, map.seed || 1) * 20 - 10
                 const shade = Math.floor(74 + v)
                 ctx.fillStyle = `rgb(${shade},${shade},${shade})`
                 ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
               }
-
-              const left = x > 0 ? isDriveable(map.tiles[y][x - 1]) : false
-              const right = x < MAP_WIDTH - 1 ? isDriveable(map.tiles[y][x + 1]) : false
-              const up = y > 0 ? isDriveable(map.tiles[y - 1][x]) : false
-              const down = y < MAP_HEIGHT - 1 ? isDriveable(map.tiles[y + 1][x]) : false
-
-              if (tileType === 0) {
-                if ((left || right) && !(up || down)) {
-                  ctx.globalAlpha = 0.5
-                  ctx.fillStyle = '#d9bf5a'
-                  const yMid = y * TILE_SIZE + TILE_SIZE / 2 - 1
-                  for (let i = 0; i < 3; i++) {
-                    ctx.fillRect(x * TILE_SIZE + 6 + i * 12, yMid, 6, 2)
-                  }
-                  ctx.globalAlpha = 1
-                } else if ((up || down) && !(left || right)) {
-                  ctx.globalAlpha = 0.5
-                  ctx.fillStyle = '#d9bf5a'
-                  const xMid = x * TILE_SIZE + TILE_SIZE / 2 - 1
-                  for (let i = 0; i < 3; i++) {
-                    ctx.fillRect(xMid, y * TILE_SIZE + 6 + i * 12, 2, 6)
-                  }
-                  ctx.globalAlpha = 1
-                }
-              }
-
-              if (tileType === 3) {
-                ctx.globalAlpha = 0.35
-                ctx.fillStyle = '#e5e7eb'
-                const inset = 6
-                for (let i = 0; i < 3; i++) {
-                  ctx.fillRect(
-                    x * TILE_SIZE + inset + i * 10,
-                    y * TILE_SIZE + 8,
-                    2,
-                    TILE_SIZE - 16
-                  )
-                }
-                ctx.globalAlpha = 1
-              }
-            } else if (tileType === 4) {
+            } else if (tileType === 2) {
               const seed = map.seed || 1
-              const v = hash01(x, y, seed) * 26 - 10
-              const g = Math.floor(46 + v)
-              const r = Math.floor(22 + v * 0.3)
-              const b = Math.floor(22 + v * 0.2)
-              ctx.fillStyle = `rgb(${r},${g},${b})`
+              const v = hash01(x, y, seed) * 18 - 12
+              const shade = Math.floor(56 + v)
+              ctx.fillStyle = `rgb(${shade},${shade},${shade})`
               ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-              ctx.globalAlpha = 0.28
-              ctx.fillStyle = '#0b120b'
-              for (let i = 0; i < 12; i++) {
-                const px = x * TILE_SIZE + ((i * 7) % TILE_SIZE)
-                const py = y * TILE_SIZE + ((i * 11) % TILE_SIZE)
+
+              ctx.globalAlpha = 0.25
+              ctx.fillStyle = '#0b0b0b'
+              for (let i = 0; i < 8; i++) {
+                const px = x * TILE_SIZE + ((i * 9) % TILE_SIZE)
+                const py = y * TILE_SIZE + ((i * 13) % TILE_SIZE)
                 ctx.fillRect(px, py, 2, 2)
+              }
+              ctx.globalAlpha = 1
+            } else if (tileType === 3) {
+              const seed = map.seed || 1
+              const v = hash01(x, y, seed) * 14 - 8
+              const shade = Math.floor(62 + v)
+              ctx.fillStyle = `rgb(${shade},${shade},${shade})`
+              ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+
+              ctx.globalAlpha = 0.35
+              ctx.fillStyle = '#e5e7eb'
+              const inset = 7
+              for (let i = 0; i < 3; i++) {
+                ctx.fillRect(x * TILE_SIZE + inset + i * 10, y * TILE_SIZE + 8, 2, TILE_SIZE - 16)
               }
               ctx.globalAlpha = 1
             } else {
@@ -561,11 +530,6 @@ function Mission({ contract, onComplete, onExit }) {
             }
           }
           
-          if (tileType === 0) {
-            ctx.strokeStyle = '#333333'
-            ctx.lineWidth = 1
-            ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-          }
         }
       }
       
@@ -620,7 +584,6 @@ function Mission({ contract, onComplete, onExit }) {
       const minimapCanvas = minimapRef.current
       if (minimapCanvas) {
         const miniCtx = minimapCanvas.getContext('2d')
-        miniCtx.imageSmoothingEnabled = false
         const scale = MINIMAP_SIZE / (MAP_WIDTH * TILE_SIZE)
         
         miniCtx.fillStyle = '#1a1a1a'
