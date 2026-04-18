@@ -133,6 +133,19 @@ const drawRoadStamp = (ctx, sheet, stamp, x, y) => {
   ctx.translate(destX + destW / 2, destY + destH / 2)
   ctx.rotate(stamp.rot || 0)
   ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
+  if (Array.isArray(stamp.mask) && stamp.mask.length) {
+    const halfW = destW / 2
+    const halfH = destH / 2
+    const armW = Math.floor(destW * 0.34)
+    const armHalf = armW / 2
+    ctx.fillStyle = '#4b4b4b'
+    for (const side of stamp.mask) {
+      if (side === 'N') ctx.fillRect(-armHalf, -halfH, armW, halfH)
+      else if (side === 'S') ctx.fillRect(-armHalf, 0, armW, halfH)
+      else if (side === 'W') ctx.fillRect(-halfW, -armHalf, halfW, armW)
+      else if (side === 'E') ctx.fillRect(0, -armHalf, halfW, armW)
+    }
+  }
   ctx.restore()
 
   return true
