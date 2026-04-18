@@ -134,7 +134,8 @@ const findNextMove = (police, targetX, targetY, map, speed) => {
 
 export const getPoliceBehavior = (police, player, heat, map) => {
   const now = Date.now()
-  const baseSpeed = (0.55 + (heat * 0.08)) * 2
+  const speedMult = 2
+  const baseSpeed = (0.55 + (heat * 0.08)) * speedMult
   let move = { vx: 0, vy: 0 }
   
   if (!police.state) {

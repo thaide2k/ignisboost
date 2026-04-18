@@ -295,6 +295,7 @@ function Mission({ contract, onComplete, onExit }) {
   const lastPoliceSpawnRef = useRef(0)
   const lastHeartbeatRef = useRef(0)
   const lastFrameTimeRef = useRef(0)
+  const movementSpeedMultRef = useRef(2)
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -357,7 +358,7 @@ function Mission({ contract, onComplete, onExit }) {
       
       const zoom = player.hasCar ? 0.86 : 0.92
       const speedScale = 1 / zoom
-      const baseSpeed = (player.hasCar ? 1.55 : 0.9) * 2
+      const baseSpeed = (player.hasCar ? 1.55 : 0.9) * movementSpeedMultRef.current
       const speed = baseSpeed * speedScale * dtFactor
       
       let dx = 0
@@ -441,7 +442,7 @@ function Mission({ contract, onComplete, onExit }) {
             police.push({
               x: spawnTileX * TILE_SIZE + TILE_SIZE / 2,
               y: spawnTileY * TILE_SIZE + TILE_SIZE / 2,
-              speed: (0.4 + heat * 0.06) * 2
+              speed: (0.4 + heat * 0.06) * movementSpeedMultRef.current
             })
             
             lastPoliceSpawnRef.current = now
