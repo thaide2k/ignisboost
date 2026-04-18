@@ -77,6 +77,49 @@ const drawCar = (ctx, x, y, angle, color, now, opts = {}) => {
   ctx.restore()
 }
 
+const getDirIndex = (angle, dirCount) => {
+  const twoPi = Math.PI * 2
+  const a = ((angle + Math.PI / 2) % twoPi + twoPi) % twoPi
+  return Math.round((a / twoPi) * dirCount) % dirCount
+}
+
+const drawVehicleSprite = (ctx, x, y, angle, sprite, now, opts = {}) => {
+  if (!sprite) return false
+
+  let dirs = sprite
+  if (Array.isArray(sprite) && Array.isArray(sprite[0])) {
+    const frameCount = sprite.length
+    const frame = Math.floor(now / 120) % frameCount
+    dirs = sprite[frame]
+  }
+
+  if (!Array.isArray(dirs) || dirs.length === 0) return false
+
+  const idx = getDirIndex(angle, dirs.length)
+  const img = dirs[idx]
+  if (!img) return false
+
+  const size = opts.size ?? 34
+  const r = size / 2
+
+  ctx.save()
+  ctx.imageSmoothingEnabled = false
+
+  if (opts.highlight) {
+    const pulse = 0.5 + 0.5 * Math.sin(now / 220)
+    ctx.globalAlpha = 0.18 + pulse * 0.2
+    ctx.fillStyle = opts.highlight
+    ctx.beginPath()
+    ctx.arc(x, y, r + 10, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+
+  ctx.drawImage(img, x - r, y - r, size, size)
+  ctx.restore()
+  return true
+}
+
 const drawPed = (ctx, x, y, angle, now, opts = {}) => {
   const r = opts.r ?? 6
   const color = opts.color ?? '#4ade80'
@@ -666,7 +709,9 @@ function Mission({ contract, onComplete, onExit }) {
       
       if (!player.hasCar && targetCar.exists) {
         const pulse = 0.5 + 0.5 * Math.sin(now / 220)
-        drawCar(ctx, targetCar.x, targetCar.y, Math.PI / 2, '#ff6b35', now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })
+        if (!drawVehicleSprite(ctx, targetCar.x, targetCar.y, Math.PI / 2, sprites?.vehicles?.target, now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })) {
+          drawCar(ctx, targetCar.x, targetCar.y, Math.PI / 2, '#ff6b35', now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })
+        }
       }
       
       if (player.hasCar) {
@@ -689,11 +734,15 @@ function Mission({ contract, onComplete, onExit }) {
       }
       
       police.forEach(cop => {
-        drawCar(ctx, cop.x, cop.y, cop.angle ?? 0, '#2b6fff', now, { siren: true, w: 26, h: 15 })
+        if (!drawVehicleSprite(ctx, cop.x, cop.y, cop.angle ?? 0, sprites?.vehicles?.police, now, { size: 34 })) {
+          drawCar(ctx, cop.x, cop.y, cop.angle ?? 0, '#2b6fff', now, { siren: true, w: 26, h: 15 })
+        }
       })
       
       if (player.hasCar) {
-        drawCar(ctx, player.x, player.y, player.angle, '#ff6b35', now, { w: 30, h: 16 })
+        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, sprites?.vehicles?.player, now, { size: 34 })) {
+          drawCar(ctx, player.x, player.y, player.angle, '#ff6b35', now, { w: 30, h: 16 })
+        }
       } else {
         drawPed(ctx, player.x, player.y, player.angle, now, { color: '#4ade80', highlight: '#ff6b35' })
       }

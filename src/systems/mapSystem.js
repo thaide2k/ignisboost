@@ -231,10 +231,49 @@ export const BUILDING_VARIANTS = {
 const SPRITE_SIZE = 16
 
 export const loadSprites = () => {
+  const createDirectionalSprites = (img, dirCount = 16) => {
+    const w = img.naturalWidth || img.width
+    const h = img.naturalHeight || img.height
+    const size = Math.ceil(Math.sqrt(w * w + h * h))
+    const out = []
+    for (let i = 0; i < dirCount; i++) {
+      const a = (i / dirCount) * Math.PI * 2
+      const c = document.createElement('canvas')
+      c.width = size
+      c.height = size
+      const ctx = c.getContext('2d')
+      ctx.imageSmoothingEnabled = false
+      ctx.translate(size / 2, size / 2)
+      ctx.rotate(a)
+      ctx.drawImage(img, -w / 2, -h / 2)
+      out.push(c)
+    }
+    return out
+  }
+
   return Promise.all([
+    loadImage('/assets/sprites/buildings.png'),
     loadImage('/assets/sprites/streets_1.png'),
-    loadImage('/assets/sprites/streets_2.png')
-  ]).then(([streets1, streets2]) => ({ streets1, streets2 }))
+    loadImage('/assets/sprites/streets_2.png'),
+    loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Car.png'),
+    loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/taxi.png'),
+    loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/1.png'),
+    loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/2.png'),
+    loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/3.png')
+  ]).then(([buildings, streets1, streets2, car, taxi, police1, police2, police3]) => {
+    const dirCount = 16
+    return {
+      buildings,
+      streets1,
+      streets2,
+      vehicles: {
+        dirCount,
+        player: createDirectionalSprites(car, dirCount),
+        target: createDirectionalSprites(taxi, dirCount),
+        police: [police1, police2, police3].map((f) => createDirectionalSprites(f, dirCount))
+      }
+    }
+  })
 }
 
 const loadImage = (src) => {
