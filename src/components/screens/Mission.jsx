@@ -294,6 +294,7 @@ function Mission({ contract, onComplete, onExit }) {
   const animationRef = useRef(null)
   const lastPoliceSpawnRef = useRef(0)
   const lastHeartbeatRef = useRef(0)
+  const lastFrameTimeRef = useRef(0)
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -346,12 +347,18 @@ function Mission({ contract, onComplete, onExit }) {
     
     const gameLoop = () => {
       const now = Date.now()
+      const prev = lastFrameTimeRef.current || now
+      lastFrameTimeRef.current = now
+      const dtFactor = Math.max(0.5, Math.min(2.5, (now - prev) / 16.6667))
       const player = playerRef.current
       const targetCar = targetCarRef.current
       const delivery = deliveryRef.current
       const police = policeRef.current
       
-      const speed = player.hasCar ? 1 : 0.8
+      const zoom = player.hasCar ? 0.86 : 0.92
+      const speedScale = 1 / zoom
+      const baseSpeed = player.hasCar ? 1.55 : 0.9
+      const speed = baseSpeed * speedScale * dtFactor
       
       let dx = 0
       let dy = 0
@@ -444,8 +451,8 @@ function Mission({ contract, onComplete, onExit }) {
       
       police.forEach((cop, index) => {
         const behavior = getPoliceBehavior(cop, player, heat, map)
-        cop.x += behavior.vx
-        cop.y += behavior.vy
+        cop.x += behavior.vx * dtFactor
+        cop.y += behavior.vy * dtFactor
         cop.vx = behavior.vx
         cop.vy = behavior.vy
         if (cop.vx !== 0 || cop.vy !== 0) {
@@ -486,7 +493,6 @@ function Mission({ contract, onComplete, onExit }) {
       const mapWidth = MAP_WIDTH * TILE_SIZE
       const mapHeight = MAP_HEIGHT * TILE_SIZE
 
-      const zoom = player.hasCar ? 0.86 : 0.92
       const viewW = canvas.width / zoom
       const viewH = canvas.height / zoom
 
@@ -498,8 +504,9 @@ function Mission({ contract, onComplete, onExit }) {
       const targetCamX = player.x + laX - viewW / 2
       const targetCamY = player.y + laY - viewH / 2
 
-      cameraRef.current.x += (targetCamX - cameraRef.current.x) * 0.12
-      cameraRef.current.y += (targetCamY - cameraRef.current.y) * 0.12
+      const camLerp = 1 - Math.pow(1 - 0.12, dtFactor)
+      cameraRef.current.x += (targetCamX - cameraRef.current.x) * camLerp
+      cameraRef.current.y += (targetCamY - cameraRef.current.y) * camLerp
 
       cameraRef.current.x = clamp(cameraRef.current.x, 0, Math.max(0, mapWidth - viewW))
       cameraRef.current.y = clamp(cameraRef.current.y, 0, Math.max(0, mapHeight - viewH))
