@@ -128,6 +128,8 @@ const drawRoadStamp = (ctx, sheet, stamp, x, y) => {
   const destH = (stamp.spanY || 2) * TILE_SIZE
 
   ctx.save()
+  ctx.fillStyle = '#4b4b4b'
+  ctx.fillRect(destX, destY, destW, destH)
   ctx.translate(destX + destW / 2, destY + destH / 2)
   ctx.rotate(stamp.rot || 0)
   ctx.drawImage(sheet, stamp.sx, stamp.sy, stamp.sw, stamp.sh, -destW / 2, -destH / 2, destW, destH)
@@ -436,6 +438,8 @@ function Mission({ contract, onComplete, onExit }) {
 
       const isDriveable = (t) => t === 0 || t === 2 || t === 3
 
+      const drawnRoadStamps = new Set()
+
       for (let y = startTileY; y <= endTileY; y++) {
         for (let x = startTileX; x <= endTileX; x++) {
           if (y < 0 || y >= MAP_HEIGHT || x < 0 || x >= MAP_WIDTH) continue
@@ -481,12 +485,23 @@ function Mission({ contract, onComplete, onExit }) {
             if (tileType === 0) {
               const stampInfo = map.roadStampIndex?.[y]?.[x]
 
-              if (stampInfo?.covered && !stampInfo.anchor) {
-                continue
-              }
+              if (stampInfo?.covered) {
+                const ax = x & ~1
+                const ay = y & ~1
+                const k = `${ax},${ay}`
 
-              if (stampInfo?.anchor) {
-                drewSprite = drawRoadStamp(ctx, sprites?.streets2, stampInfo.stamp, x, y)
+                if (!drawnRoadStamps.has(k)) {
+                  const anchorInfo = map.roadStampIndex?.[ay]?.[ax]
+                  drewSprite = drawRoadStamp(ctx, sprites?.streets2, anchorInfo?.stamp, ax, ay)
+                  if (!drewSprite) {
+                    const v = hash01(ax, ay, map.seed || 1) * 18 - 10
+                    const shade = Math.floor(74 + v)
+                    ctx.fillStyle = `rgb(${shade},${shade},${shade})`
+                    ctx.fillRect(ax * TILE_SIZE, ay * TILE_SIZE, TILE_SIZE * 2, TILE_SIZE * 2)
+                  }
+                  drawnRoadStamps.add(k)
+                }
+                continue
               }
 
               if (!drewSprite) {
