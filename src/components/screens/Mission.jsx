@@ -1299,7 +1299,7 @@ function Mission({ contract, onComplete, onExit }) {
       })
       
       if (player.hasCar) {
-        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, sprites?.vehicles?.player, now, { size: 68 })) {
+        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, targetVehicleSprite, now, { size: 68 })) {
           drawCar(ctx, player.x, player.y, player.angle, '#ff6b35', now, { w: 30, h: 16 })
         }
       } else {
