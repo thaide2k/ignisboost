@@ -230,6 +230,153 @@ export const BUILDING_VARIANTS = {
 
 const SPRITE_SIZE = 16
 
+const RANKED_TARGET_MODELS = [
+  {
+    tier: 'D',
+    model: 'toyota_yaris',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/toyota_yaris_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/toyota_yaris_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/toyota_yaris_animation/3.png'
+    ]
+  },
+  {
+    tier: 'D',
+    model: 'hyundai_i10',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/hyundai_i10_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/hyundai_i10_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/hyundai_i10_animation/3.png'
+    ]
+  },
+  {
+    tier: 'D',
+    model: 'kia_rio',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/kia_rio_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/kia_rio_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/kia_rio_animation/3.png'
+    ]
+  },
+  {
+    tier: 'D',
+    model: 'chevrolet_spark',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/chevrolet_spark_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/chevrolet_spark_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_d/chevrolet_spark_animation/3.png'
+    ]
+  },
+  {
+    tier: 'C',
+    model: 'volkswagen_golf',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/volkswagen_golf_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/volkswagen_golf_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/volkswagen_golf_animation/3.png'
+    ]
+  },
+  {
+    tier: 'C',
+    model: 'honda_civic',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/honda_civic_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/honda_civic_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/honda_civic_animation/3.png'
+    ]
+  },
+  {
+    tier: 'C',
+    model: 'mazda_3',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/mazda_3_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/mazda_3_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/mazda_3_animation/3.png'
+    ]
+  },
+  {
+    tier: 'C',
+    model: 'ford_focus',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/ford_focus_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/ford_focus_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_c/ford_focus_animation/3.png'
+    ]
+  },
+  {
+    tier: 'B',
+    model: 'toyota_camry',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/toyota_camry_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/toyota_camry_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/toyota_camry_animation/3.png'
+    ]
+  },
+  {
+    tier: 'B',
+    model: 'bmw_3_series',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/bmw_3_series_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/bmw_3_series_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/bmw_3_series_animation/3.png'
+    ]
+  },
+  {
+    tier: 'B',
+    model: 'audi_a4',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/audi_a4_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/audi_a4_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/audi_a4_animation/3.png'
+    ]
+  },
+  {
+    tier: 'B',
+    model: 'mercedes_c_class',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/mercedes_c_class_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/mercedes_c_class_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_b/mercedes_c_class_animation/3.png'
+    ]
+  },
+  {
+    tier: 'A',
+    model: 'bmw_m3',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/bmw_m3_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/bmw_m3_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/bmw_m3_animation/3.png'
+    ]
+  },
+  {
+    tier: 'A',
+    model: 'mercedes_amg_c63',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/mercedes_amg_c63_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/mercedes_amg_c63_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/mercedes_amg_c63_animation/3.png'
+    ]
+  },
+  {
+    tier: 'A',
+    model: 'audi_rs5',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/audi_rs5_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/audi_rs5_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/audi_rs5_animation/3.png'
+    ]
+  },
+  {
+    tier: 'A',
+    model: 'porsche_911',
+    frames: [
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/porsche_911_animation/1.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/porsche_911_animation/2.png',
+      '/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_a/porsche_911_animation/3.png'
+    ]
+  }
+]
+
 export const loadSprites = () => {
   const createDirectionalSprites = (img, dirCount = 16) => {
     const w = img.naturalWidth || img.width
@@ -251,6 +398,8 @@ export const loadSprites = () => {
     return out
   }
 
+  const rankedLoads = RANKED_TARGET_MODELS.flatMap((m) => m.frames.map((src) => loadImage(src)))
+
   return Promise.all([
     loadImage('/assets/sprites/buildings.png'),
     loadImage('/assets/sprites/streets_1.png'),
@@ -260,8 +409,17 @@ export const loadSprites = () => {
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/1.png'),
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/2.png'),
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/3.png')
-  ]).then(([buildings, streets1, streets2, car, taxi, police1, police2, police3]) => {
+  ].concat(rankedLoads)).then((imgs) => {
+    const [buildings, streets1, streets2, car, taxi, police1, police2, police3] = imgs
     const dirCount = 16
+    const rankedTargets = {}
+    let p = 8
+    for (const m of RANKED_TARGET_MODELS) {
+      const frames = [imgs[p], imgs[p + 1], imgs[p + 2]]
+      p += 3
+      if (!rankedTargets[m.tier]) rankedTargets[m.tier] = {}
+      rankedTargets[m.tier][m.model] = frames.map((f) => createDirectionalSprites(f, dirCount))
+    }
     return {
       buildings,
       streets1,
@@ -270,6 +428,7 @@ export const loadSprites = () => {
         dirCount,
         player: createDirectionalSprites(car, dirCount),
         target: createDirectionalSprites(taxi, dirCount),
+        targetsByTier: rankedTargets,
         police: [police1, police2, police3].map((f) => createDirectionalSprites(f, dirCount))
       }
     }
