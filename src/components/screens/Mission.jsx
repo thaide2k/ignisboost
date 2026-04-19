@@ -542,7 +542,7 @@ function Mission({ contract, onComplete, onExit }) {
       const viewH = canvas.height / zoom
 
       const vLen = Math.sqrt(player.vx * player.vx + player.vy * player.vy)
-      const lookAhead = player.hasCar ? 220 : 160
+      const lookAhead = 0
       const laX = vLen > 0 ? (player.vx / vLen) * lookAhead : 0
       const laY = vLen > 0 ? (player.vy / vLen) * lookAhead : 0
 
