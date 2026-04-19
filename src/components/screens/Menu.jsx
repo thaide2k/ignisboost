@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { generateContracts, getTierColor } from '../../systems/contractSystem'
-import { getCarEmoji, getCarColor } from '../../systems/carSprites'
 import './Menu.css'
 
 const NAV_ITEMS = [
@@ -117,9 +116,9 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
                     <div className="car-visual">
                       <span 
                         className="car-emoji"
-                        style={{ color: getCarColor(contract.carType) }}
+                        style={{ color: getTierColor(contract.tier) }}
                       >
-                        {getCarEmoji(contract.carType)}
+                        🚗
                       </span>
                     </div>
                     <div className="contract-body">

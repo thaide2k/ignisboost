@@ -22,10 +22,12 @@ export const createContract = (tier, id) => {
     S: 5
   }
 
-  const carTypes = [
-    'Sports Sedan', 'Muscle Car', 'Supercar', 'Luxury SUV', 
-    'Hatchback', 'Coupe', 'Exotic', 'Classic'
-  ]
+  const carModelsByTier = {
+    D: ['Toyota Yaris', 'Hyundai i10', 'Kia Rio', 'Chevrolet Spark'],
+    C: ['Volkswagen Golf', 'Honda Civic', 'Mazda 3', 'Ford Focus'],
+    B: ['Toyota Camry', 'BMW 3 Series', 'Audi A4', 'Mercedes-Benz C-Class'],
+    A: ['BMW M3', 'Mercedes-AMG C63', 'Audi RS5', 'Porsche 911']
+  }
 
   const locations = [
     'Downtown', 'Industrial District', 'Suburbs', 'Harbor District',
@@ -35,6 +37,7 @@ export const createContract = (tier, id) => {
   const tierIndex = TIER_ORDER.indexOf(tier)
   const difficultyMultiplier = 1 + (tierIndex * 0.3)
   const randomFactor = 0.8 + Math.random() * 0.4
+  const models = carModelsByTier[tier] || carModelsByTier.D
 
   return {
     id: `contract-${id}-${Date.now()}`,
@@ -42,7 +45,7 @@ export const createContract = (tier, id) => {
     reward: Math.floor(baseReward[tier] * randomFactor),
     heatLevel: baseHeat[tier],
     difficulty: tierIndex + 1,
-    carType: carTypes[Math.floor(Math.random() * carTypes.length)],
+    carType: models[Math.floor(Math.random() * models.length)],
     location: locations[Math.floor(Math.random() * locations.length)],
     timeLimit: Math.floor((180 - (tierIndex * 20)) * (0.8 + Math.random() * 0.4)),
     expiresIn: Math.floor(60 + Math.random() * 60)
