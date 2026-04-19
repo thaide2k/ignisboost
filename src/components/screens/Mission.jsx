@@ -648,8 +648,13 @@ function Mission({ contract, onComplete, onExit }) {
             const dxp = player.x - guard.x
             const dyp = player.y - guard.y
             const dist = Math.sqrt(dxp * dxp + dyp * dyp) || 1
-            const nx = dxp / dist
-            const ny = dyp / dist
+            const baseAng = Math.atan2(dyp, dxp)
+            const spreadBase = 0.22
+            const spreadScale = clamp(dist / 240, 0.35, 1.2)
+            const spread = (Math.random() - 0.5) * spreadBase * spreadScale
+            const ang = baseAng + spread
+            const nx = Math.cos(ang)
+            const ny = Math.sin(ang)
             const muzzle = 22
             const bulletSpeed = 7.8
             bulletsRef.current.push({
