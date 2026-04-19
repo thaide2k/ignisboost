@@ -161,6 +161,46 @@ const drawPed = (ctx, x, y, angle, now, opts = {}) => {
   ctx.restore()
 }
 
+const drawGuard = (ctx, guard, now) => {
+  if (!guard || guard.hp <= 0) return
+
+  const blink = guard.invulnUntil && now < guard.invulnUntil && Math.floor(now / 80) % 2 === 0
+  if (blink) return
+
+  const r = 14
+  ctx.save()
+  ctx.globalAlpha = 0.22
+  ctx.fillStyle = '#000000'
+  ctx.beginPath()
+  ctx.ellipse(guard.x + 2, guard.y + 10, r * 0.9, r * 0.55, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1
+
+  ctx.fillStyle = '#ef4444'
+  ctx.beginPath()
+  ctx.arc(guard.x, guard.y, r, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.lineWidth = 3
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+  ctx.beginPath()
+  ctx.arc(guard.x, guard.y, r + 1, 0, Math.PI * 2)
+  ctx.stroke()
+
+  const maxHp = 3
+  const w = 38
+  const h = 6
+  const x0 = guard.x - w / 2
+  const y0 = guard.y - 30
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'
+  roundRect(ctx, x0, y0, w, h, 3)
+  ctx.fill()
+  ctx.fillStyle = '#22c55e'
+  roundRect(ctx, x0 + 1, y0 + 1, (w - 2) * (guard.hp / maxHp), h - 2, 2)
+  ctx.fill()
+  ctx.restore()
+}
+
 const drawRoadStamp = (ctx, sheet, stamp, x, y, seed = 1) => {
   if (!sheet?.complete || sheet.naturalWidth === 0) return false
   if (!stamp) return false
@@ -262,6 +302,30 @@ const drawRoadStamp = (ctx, sheet, stamp, x, y, seed = 1) => {
   return true
 }
 
+const findNearestRoadTile = (map, start, maxRadius = 6) => {
+  const sx = clamp(start.x | 0, 0, map.width - 1)
+  const sy = clamp(start.y | 0, 0, map.height - 1)
+  if (map.tiles?.[sy]?.[sx] === 0) return { x: sx, y: sy }
+
+  for (let r = 1; r <= maxRadius; r++) {
+    const x0 = clamp(sx - r, 0, map.width - 1)
+    const x1 = clamp(sx + r, 0, map.width - 1)
+    const y0 = clamp(sy - r, 0, map.height - 1)
+    const y1 = clamp(sy + r, 0, map.height - 1)
+
+    for (let x = x0; x <= x1; x++) {
+      if (map.tiles?.[y0]?.[x] === 0) return { x, y: y0 }
+      if (map.tiles?.[y1]?.[x] === 0) return { x, y: y1 }
+    }
+    for (let y = y0 + 1; y <= y1 - 1; y++) {
+      if (map.tiles?.[y]?.[x0] === 0) return { x: x0, y }
+      if (map.tiles?.[y]?.[x1] === 0) return { x: x1, y }
+    }
+  }
+
+  return { x: sx, y: sy }
+}
+
 function Mission({ contract, onComplete, onExit }) {
   const canvasRef = useRef(null)
   const minimapRef = useRef(null)
@@ -286,6 +350,25 @@ function Mission({ contract, onComplete, onExit }) {
       targetCarRef.current.y = newMap.spawnPoints.targetCar.y * TILE_SIZE + TILE_SIZE / 2
       deliveryRef.current.x = newMap.spawnPoints.delivery.x * TILE_SIZE + TILE_SIZE / 2
       deliveryRef.current.y = newMap.spawnPoints.delivery.y * TILE_SIZE + TILE_SIZE / 2
+    }
+
+    if (newMap?.spawnPoints?.targetCar) {
+      const tc = newMap.spawnPoints.targetCar
+      const tile = findNearestRoadTile(newMap, { x: tc.x - 1, y: tc.y }, 8)
+      guardRef.current = {
+        x: tile.x * TILE_SIZE + TILE_SIZE / 2,
+        y: tile.y * TILE_SIZE + TILE_SIZE / 2,
+        homeX: tile.x * TILE_SIZE + TILE_SIZE / 2,
+        homeY: tile.y * TILE_SIZE + TILE_SIZE / 2,
+        hp: 3,
+        state: 'GUARD',
+        lastAttackAt: 0,
+        stunUntil: 0,
+        invulnUntil: 0,
+        knockVx: 0,
+        knockVy: 0,
+        knockUntil: 0
+      }
     }
   }, [])
   const [sprites, setSprites] = useState(null)
@@ -339,6 +422,8 @@ function Mission({ contract, onComplete, onExit }) {
   const lastHeartbeatRef = useRef(0)
   const lastFrameTimeRef = useRef(0)
   const movementSpeedMultRef = useRef(2)
+  const guardRef = useRef(null)
+  const prevSpaceRef = useRef(false)
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -398,6 +483,7 @@ function Mission({ contract, onComplete, onExit }) {
       const targetCar = targetCarRef.current
       const delivery = deliveryRef.current
       const police = policeRef.current
+      const guard = guardRef.current
       
       const zoomBase = player.hasCar ? 0.86 : 0.92
       const zoom = zoomBase * 2
@@ -408,10 +494,13 @@ function Mission({ contract, onComplete, onExit }) {
       let dx = 0
       let dy = 0
       
-      if (keysRef.current['w'] || keysRef.current['arrowup']) dy = -speed
-      if (keysRef.current['s'] || keysRef.current['arrowdown']) dy = speed
-      if (keysRef.current['a'] || keysRef.current['arrowleft']) dx = -speed
-      if (keysRef.current['d'] || keysRef.current['arrowright']) dx = speed
+      const isStunned = player.stunUntil && now < player.stunUntil
+      if (!isStunned) {
+        if (keysRef.current['w'] || keysRef.current['arrowup']) dy = -speed
+        if (keysRef.current['s'] || keysRef.current['arrowdown']) dy = speed
+        if (keysRef.current['a'] || keysRef.current['arrowleft']) dx = -speed
+        if (keysRef.current['d'] || keysRef.current['arrowright']) dx = speed
+      }
 
       player.vx = dx
       player.vy = dy
@@ -419,6 +508,11 @@ function Mission({ contract, onComplete, onExit }) {
         player.angle = Math.atan2(dy, dx)
       }
       
+      if (player.knockUntil && now < player.knockUntil) {
+        dx += player.knockVx * dtFactor
+        dy += player.knockVy * dtFactor
+      }
+
       const newX = player.x + dx
       const newY = player.y + dy
       
@@ -428,6 +522,89 @@ function Mission({ contract, onComplete, onExit }) {
       if (isWalkable(player.x, newY, map)) {
         player.y = newY
       }
+
+      if (guard && guard.hp > 0) {
+        const toCarDx = (targetCar.x - player.x)
+        const toCarDy = (targetCar.y - player.y)
+        const distToCar = Math.sqrt(toCarDx * toCarDx + toCarDy * toCarDy)
+        const aggro = distToCar < 160
+
+        if (aggro) guard.state = 'CHASE'
+        else guard.state = 'GUARD'
+
+        const gStunned = guard.stunUntil && now < guard.stunUntil
+        let gvx = 0
+        let gvy = 0
+
+        const goalX = guard.state === 'CHASE' ? player.x : guard.homeX
+        const goalY = guard.state === 'CHASE' ? player.y : guard.homeY
+        const gdx = goalX - guard.x
+        const gdy = goalY - guard.y
+        const gdist = Math.sqrt(gdx * gdx + gdy * gdy)
+
+        if (!gStunned && gdist > 1) {
+          const gs = 0.55 * dtFactor
+          gvx = (gdx / gdist) * gs
+          gvy = (gdy / gdist) * gs
+        }
+
+        if (guard.knockUntil && now < guard.knockUntil) {
+          gvx += guard.knockVx * dtFactor
+          gvy += guard.knockVy * dtFactor
+        }
+
+        const gNewX = guard.x + gvx
+        const gNewY = guard.y + gvy
+        if (isWalkable(gNewX, guard.y, map)) guard.x = gNewX
+        if (isWalkable(guard.x, gNewY, map)) guard.y = gNewY
+
+        const pDx = player.x - guard.x
+        const pDy = player.y - guard.y
+        const pDist = Math.sqrt(pDx * pDx + pDy * pDy)
+        if (aggro && pDist < 40 && now - guard.lastAttackAt > 700) {
+          guard.lastAttackAt = now
+          const nx = pDist > 0 ? pDx / pDist : 0
+          const ny = pDist > 0 ? pDy / pDist : 0
+          player.knockVx = nx * 2.6
+          player.knockVy = ny * 2.6
+          player.knockUntil = now + 140
+          player.stunUntil = now + 180
+          setHeat((h) => Math.min(5, h + 0.35))
+        }
+
+        const spaceNow = !!(keysRef.current[' '] || keysRef.current['space'])
+        const spacePressed = spaceNow && !prevSpaceRef.current
+        prevSpaceRef.current = spaceNow
+
+        if (spacePressed && !isStunned) {
+          player.lastAttackAt = player.lastAttackAt || 0
+          if (now - player.lastAttackAt > 320) {
+            player.lastAttackAt = now
+            const ax = player.x + Math.cos(player.angle) * 28
+            const ay = player.y + Math.sin(player.angle) * 28
+            const adx = guard.x - ax
+            const ady = guard.y - ay
+            const aDist = Math.sqrt(adx * adx + ady * ady)
+            if (aDist < 32 && (!guard.invulnUntil || now > guard.invulnUntil)) {
+              guard.hp -= 1
+              guard.invulnUntil = now + 220
+              guard.stunUntil = now + 160
+              const knx = aDist > 0 ? adx / aDist : Math.cos(player.angle)
+              const kny = aDist > 0 ? ady / aDist : Math.sin(player.angle)
+              guard.knockVx = knx * 2.2
+              guard.knockVy = kny * 2.2
+              guard.knockUntil = now + 120
+              if (guard.hp <= 0) {
+                guard.hp = 0
+                guard.state = 'DOWN'
+              }
+            }
+          }
+        }
+      } else {
+        const spaceNow = !!(keysRef.current[' '] || keysRef.current['space'])
+        prevSpaceRef.current = spaceNow
+      }
       
       if (!player.hasCar && targetCar.exists) {
         const distToCar = Math.sqrt(
@@ -435,7 +612,8 @@ function Mission({ contract, onComplete, onExit }) {
           Math.pow(player.y - targetCar.y, 2)
         )
         
-        if (distToCar < 40 && !showMiniGameRef.current) {
+        const guardAlive = guardRef.current && guardRef.current.hp > 0
+        if (distToCar < 40 && !guardAlive && !showMiniGameRef.current) {
           setMiniGameType('hotwire')
           showMiniGameRef.current = true
           setShowMiniGame(true)
@@ -732,6 +910,10 @@ function Mission({ contract, onComplete, onExit }) {
         ctx.stroke()
         ctx.setLineDash([])
         ctx.restore()
+      }
+
+      if (!player.hasCar) {
+        drawGuard(ctx, guardRef.current, now)
       }
       
       police.forEach(cop => {
