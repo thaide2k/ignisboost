@@ -204,9 +204,9 @@ const drawGuard = (ctx, guard, now) => {
 const drawBullets = (ctx, bullets) => {
   if (!bullets || bullets.length === 0) return
   ctx.save()
-  ctx.globalAlpha = 0.9
-  ctx.fillStyle = '#fbbf24'
   for (const b of bullets) {
+    ctx.globalAlpha = 0.9
+    ctx.fillStyle = b.owner === 'guard' ? '#ef4444' : '#fbbf24'
     ctx.fillRect(b.x - 2, b.y - 2, 4, 4)
   }
   ctx.restore()
@@ -456,6 +456,7 @@ function Mission({ contract, onComplete, onExit }) {
   const prevSpaceRef = useRef(false)
   const bulletsRef = useRef([])
   const gunRef = useRef({ shotsInMag: 0, reloadUntil: 0, lastShotAt: 0 })
+  const guardGunRef = useRef({ lastShotAt: 0 })
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -567,7 +568,7 @@ function Mission({ contract, onComplete, onExit }) {
           if (!isWalkable(bx, by, map)) continue
 
           let hit = false
-          if (guard && guard.hp > 0 && (!guard.invulnUntil || now > guard.invulnUntil)) {
+          if (b.owner === 'player' && guard && guard.hp > 0 && (!guard.invulnUntil || now > guard.invulnUntil)) {
             const dxg = guard.x - bx
             const dyg = guard.y - by
             if (Math.sqrt(dxg * dxg + dyg * dyg) < 20) {
@@ -583,6 +584,20 @@ function Mission({ contract, onComplete, onExit }) {
                 guard.hp = 0
                 guard.state = 'DOWN'
               }
+            }
+          }
+          if (!hit && b.owner === 'guard' && !player.hasCar && (!player.invulnUntil || now > player.invulnUntil)) {
+            const dxp = player.x - bx
+            const dyp = player.y - by
+            if (Math.sqrt(dxp * dxp + dyp * dyp) < 22) {
+              hit = true
+              player.invulnUntil = now + 220
+              const vlen = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1
+              player.knockVx = (b.vx / vlen) * 2.6
+              player.knockVy = (b.vy / vlen) * 2.6
+              player.knockUntil = now + 140
+              player.stunUntil = now + 180
+              setHeat((h) => Math.min(5, h + 0.35))
             }
           }
 
@@ -626,18 +641,26 @@ function Mission({ contract, onComplete, onExit }) {
         if (isWalkable(gNewX, guard.y, map)) guard.x = gNewX
         if (isWalkable(guard.x, gNewY, map)) guard.y = gNewY
 
-        const pDx = player.x - guard.x
-        const pDy = player.y - guard.y
-        const pDist = Math.sqrt(pDx * pDx + pDy * pDy)
-        if (aggro && pDist < 40 && now - guard.lastAttackAt > 700) {
-          guard.lastAttackAt = now
-          const nx = pDist > 0 ? pDx / pDist : 0
-          const ny = pDist > 0 ? pDy / pDist : 0
-          player.knockVx = nx * 2.6
-          player.knockVy = ny * 2.6
-          player.knockUntil = now + 140
-          player.stunUntil = now + 180
-          setHeat((h) => Math.min(5, h + 0.35))
+        if (aggro && !player.hasCar && !gStunned) {
+          const gg = guardGunRef.current
+          if (now - (gg.lastShotAt || 0) > 700) {
+            gg.lastShotAt = now
+            const dxp = player.x - guard.x
+            const dyp = player.y - guard.y
+            const dist = Math.sqrt(dxp * dxp + dyp * dyp) || 1
+            const nx = dxp / dist
+            const ny = dyp / dist
+            const muzzle = 22
+            const bulletSpeed = 7.8
+            bulletsRef.current.push({
+              owner: 'guard',
+              x: guard.x + nx * muzzle,
+              y: guard.y + ny * muzzle,
+              vx: nx * bulletSpeed,
+              vy: ny * bulletSpeed,
+              bornAt: now
+            })
+          }
         }
 
         const spaceNow = !!(keysRef.current[' '] || keysRef.current['space'])
@@ -651,6 +674,7 @@ function Mission({ contract, onComplete, onExit }) {
             const muzzle = 26
             const bulletSpeed = 10.5
             bulletsRef.current.push({
+              owner: 'player',
               x: player.x + Math.cos(player.angle) * muzzle,
               y: player.y + Math.sin(player.angle) * muzzle,
               vx: Math.cos(player.angle) * bulletSpeed,
