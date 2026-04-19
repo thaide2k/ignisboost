@@ -201,6 +201,36 @@ const drawGuard = (ctx, guard, now) => {
   ctx.restore()
 }
 
+const drawBullets = (ctx, bullets) => {
+  if (!bullets || bullets.length === 0) return
+  ctx.save()
+  ctx.globalAlpha = 0.9
+  ctx.fillStyle = '#fbbf24'
+  for (const b of bullets) {
+    ctx.fillRect(b.x - 2, b.y - 2, 4, 4)
+  }
+  ctx.restore()
+}
+
+const drawReloadIndicator = (ctx, player, gun, now) => {
+  if (!gun || !gun.reloadUntil || now >= gun.reloadUntil) return
+  const total = gun.reloadTotal || 550
+  const t = 1 - clamp((gun.reloadUntil - now) / total, 0, 1)
+  const w = 46
+  const h = 6
+  const x0 = player.x - w / 2
+  const y0 = player.y - 34
+  ctx.save()
+  ctx.globalAlpha = 0.9
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'
+  roundRect(ctx, x0, y0, w, h, 3)
+  ctx.fill()
+  ctx.fillStyle = '#fbbf24'
+  roundRect(ctx, x0 + 1, y0 + 1, (w - 2) * t, h - 2, 2)
+  ctx.fill()
+  ctx.restore()
+}
+
 const drawRoadStamp = (ctx, sheet, stamp, x, y, seed = 1) => {
   if (!sheet?.complete || sheet.naturalWidth === 0) return false
   if (!stamp) return false
@@ -424,6 +454,8 @@ function Mission({ contract, onComplete, onExit }) {
   const movementSpeedMultRef = useRef(2)
   const guardRef = useRef(null)
   const prevSpaceRef = useRef(false)
+  const bulletsRef = useRef([])
+  const gunRef = useRef({ shotsInMag: 0, reloadUntil: 0, lastShotAt: 0 })
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -484,6 +516,8 @@ function Mission({ contract, onComplete, onExit }) {
       const delivery = deliveryRef.current
       const police = policeRef.current
       const guard = guardRef.current
+      const bullets = bulletsRef.current
+      const gun = gunRef.current
       
       const zoomBase = player.hasCar ? 0.86 : 0.92
       const zoom = zoomBase * 2
@@ -521,6 +555,40 @@ function Mission({ contract, onComplete, onExit }) {
       }
       if (isWalkable(player.x, newY, map)) {
         player.y = newY
+      }
+
+      if (bullets.length) {
+        const next = []
+        for (const b of bullets) {
+          const age = now - b.bornAt
+          if (age > 900) continue
+          const bx = b.x + b.vx * dtFactor
+          const by = b.y + b.vy * dtFactor
+          if (!isWalkable(bx, by, map)) continue
+
+          let hit = false
+          if (guard && guard.hp > 0 && (!guard.invulnUntil || now > guard.invulnUntil)) {
+            const dxg = guard.x - bx
+            const dyg = guard.y - by
+            if (Math.sqrt(dxg * dxg + dyg * dyg) < 20) {
+              hit = true
+              guard.hp -= 1
+              guard.invulnUntil = now + 180
+              guard.stunUntil = now + 160
+              const vlen = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1
+              guard.knockVx = (b.vx / vlen) * 3.0
+              guard.knockVy = (b.vy / vlen) * 3.0
+              guard.knockUntil = now + 120
+              if (guard.hp <= 0) {
+                guard.hp = 0
+                guard.state = 'DOWN'
+              }
+            }
+          }
+
+          if (!hit) next.push({ ...b, x: bx, y: by })
+        }
+        bulletsRef.current = next
       }
 
       if (guard && guard.hp > 0) {
@@ -576,28 +644,24 @@ function Mission({ contract, onComplete, onExit }) {
         const spacePressed = spaceNow && !prevSpaceRef.current
         prevSpaceRef.current = spaceNow
 
-        if (spacePressed && !isStunned) {
-          player.lastAttackAt = player.lastAttackAt || 0
-          if (now - player.lastAttackAt > 320) {
-            player.lastAttackAt = now
-            const ax = player.x + Math.cos(player.angle) * 28
-            const ay = player.y + Math.sin(player.angle) * 28
-            const adx = guard.x - ax
-            const ady = guard.y - ay
-            const aDist = Math.sqrt(adx * adx + ady * ady)
-            if (aDist < 32 && (!guard.invulnUntil || now > guard.invulnUntil)) {
-              guard.hp -= 1
-              guard.invulnUntil = now + 220
-              guard.stunUntil = now + 160
-              const knx = aDist > 0 ? adx / aDist : Math.cos(player.angle)
-              const kny = aDist > 0 ? ady / aDist : Math.sin(player.angle)
-              guard.knockVx = knx * 2.2
-              guard.knockVy = kny * 2.2
-              guard.knockUntil = now + 120
-              if (guard.hp <= 0) {
-                guard.hp = 0
-                guard.state = 'DOWN'
-              }
+        if (spacePressed && !isStunned && !player.hasCar) {
+          if (now >= (gun.reloadUntil || 0) && now - (gun.lastShotAt || 0) > 170) {
+            gun.lastShotAt = now
+            gun.shotsInMag = (gun.shotsInMag || 0) + 1
+            const muzzle = 26
+            const bulletSpeed = 10.5
+            bulletsRef.current.push({
+              x: player.x + Math.cos(player.angle) * muzzle,
+              y: player.y + Math.sin(player.angle) * muzzle,
+              vx: Math.cos(player.angle) * bulletSpeed,
+              vy: Math.sin(player.angle) * bulletSpeed,
+              bornAt: now
+            })
+
+            if (gun.shotsInMag >= 5) {
+              gun.shotsInMag = 0
+              gun.reloadTotal = 550
+              gun.reloadUntil = now + gun.reloadTotal
             }
           }
         }
@@ -885,6 +949,8 @@ function Mission({ contract, onComplete, onExit }) {
           
         }
       }
+
+      drawBullets(ctx, bulletsRef.current)
       
       if (!player.hasCar && targetCar.exists) {
         const pulse = 0.5 + 0.5 * Math.sin(now / 220)
@@ -928,6 +994,7 @@ function Mission({ contract, onComplete, onExit }) {
         }
       } else {
         drawPed(ctx, player.x, player.y, player.angle, now, { color: '#4ade80', highlight: '#ff6b35' })
+        drawReloadIndicator(ctx, player, gunRef.current, now)
       }
 
       ctx.setTransform(1, 0, 0, 1, 0, 0)
