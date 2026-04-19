@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, generateMap, getTileColor, isWalkable, getBuildingVariantColor, loadSprites, getBuildingSprite } from '../../systems/mapSystem'
 import { calculateRewards } from '../../systems/missionSystem'
 import { getHeatColor, getPoliceBehavior } from '../../systems/heatSystem'
@@ -406,6 +406,12 @@ function Mission({ contract, onComplete, onExit }) {
   const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight })
   
   const cameraRef = useRef({ x: 0, y: 0 })
+  const targetVehicleSprite = useMemo(() => {
+    const tier = contract?.targetModel?.tier || contract?.tier
+    const slug = contract?.targetModel?.slug
+    if (tier && slug && sprites?.vehicles?.targetsByTier?.[tier]?.[slug]) return sprites.vehicles.targetsByTier[tier][slug]
+    return sprites?.vehicles?.target
+  }, [sprites, contract])
   
   useEffect(() => {
     const handleResize = () => {
@@ -1258,7 +1264,7 @@ function Mission({ contract, onComplete, onExit }) {
       
       if (!player.hasCar && targetCar.exists) {
         const pulse = 0.5 + 0.5 * Math.sin(now / 220)
-        if (!drawVehicleSprite(ctx, targetCar.x, targetCar.y, Math.PI / 2, sprites?.vehicles?.target, now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })) {
+        if (!drawVehicleSprite(ctx, targetCar.x, targetCar.y, Math.PI / 2, targetVehicleSprite, now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })) {
           drawCar(ctx, targetCar.x, targetCar.y, Math.PI / 2, '#ff6b35', now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })
         }
       }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { generateContracts, getTierColor } from '../../systems/contractSystem'
+import { getRankedCarPreviewSrc } from '../../systems/carSprites'
 import './Menu.css'
 
 const NAV_ITEMS = [
@@ -15,6 +16,7 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
   const [contracts, setContracts] = useState([])
   const [selectedContract, setSelectedContract] = useState(null)
   const [activeNav, setActiveNav] = useState('contracts')
+  const [failedSprites, setFailedSprites] = useState({})
 
   useEffect(() => {
     setContracts(generateContracts())
@@ -114,12 +116,27 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
                       <span className="contract-location">{contract.location}</span>
                     </div>
                     <div className="car-visual">
-                      <span 
-                        className="car-emoji"
-                        style={{ color: getTierColor(contract.tier) }}
-                      >
-                        🚗
-                      </span>
+                      {(() => {
+                        const src = getRankedCarPreviewSrc(contract?.targetModel?.tier, contract?.targetModel?.slug)
+                        if (failedSprites[contract.id] || !src) {
+                          return (
+                            <span 
+                              className="car-emoji"
+                              style={{ color: getTierColor(contract.tier) }}
+                            >
+                              🚗
+                            </span>
+                          )
+                        }
+                        return (
+                          <img
+                            className="car-sprite"
+                            src={src}
+                            alt={contract?.targetModel?.name || contract.carType}
+                            onError={() => setFailedSprites((prev) => ({ ...prev, [contract.id]: true }))}
+                          />
+                        )
+                      })()}
                     </div>
                     <div className="contract-body">
                       <h3 className="car-type">{contract.carType}</h3>

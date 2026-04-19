@@ -43,3 +43,8 @@ export const getCarColor = (carType, index = 0) => {
   const colors = CAR_SPRITES[carType]?.colors || ['#e74c3c']
   return colors[index % colors.length]
 }
+
+export const getRankedCarPreviewSrc = (tier, slug) => {
+  if (!tier || !slug) return null
+  return `/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/rank_${String(tier).toLowerCase()}/${slug}_animation/1.png`
+}

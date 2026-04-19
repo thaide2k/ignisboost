@@ -230,6 +230,31 @@ export const BUILDING_VARIANTS = {
 
 const SPRITE_SIZE = 16
 
+const rankedFrames = (rank, slug) => ([
+  `/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/${rank}/${slug}_animation/1.png`,
+  `/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/${rank}/${slug}_animation/2.png`,
+  `/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/${rank}/${slug}_animation/3.png`
+])
+
+const RANKED_TARGET_MODELS = [
+  { tier: 'D', slug: 'toyota_yaris', frames: rankedFrames('rank_d', 'toyota_yaris') },
+  { tier: 'D', slug: 'hyundai_i10', frames: rankedFrames('rank_d', 'hyundai_i10') },
+  { tier: 'D', slug: 'kia_rio', frames: rankedFrames('rank_d', 'kia_rio') },
+  { tier: 'D', slug: 'chevrolet_spark', frames: rankedFrames('rank_d', 'chevrolet_spark') },
+  { tier: 'C', slug: 'volkswagen_golf', frames: rankedFrames('rank_c', 'volkswagen_golf') },
+  { tier: 'C', slug: 'honda_civic', frames: rankedFrames('rank_c', 'honda_civic') },
+  { tier: 'C', slug: 'mazda_3', frames: rankedFrames('rank_c', 'mazda_3') },
+  { tier: 'C', slug: 'ford_focus', frames: rankedFrames('rank_c', 'ford_focus') },
+  { tier: 'B', slug: 'toyota_camry', frames: rankedFrames('rank_b', 'toyota_camry') },
+  { tier: 'B', slug: 'bmw_3_series', frames: rankedFrames('rank_b', 'bmw_3_series') },
+  { tier: 'B', slug: 'audi_a4', frames: rankedFrames('rank_b', 'audi_a4') },
+  { tier: 'B', slug: 'mercedes_c_class', frames: rankedFrames('rank_b', 'mercedes_c_class') },
+  { tier: 'A', slug: 'bmw_m3', frames: rankedFrames('rank_a', 'bmw_m3') },
+  { tier: 'A', slug: 'mercedes_amg_c63', frames: rankedFrames('rank_a', 'mercedes_amg_c63') },
+  { tier: 'A', slug: 'audi_rs5', frames: rankedFrames('rank_a', 'audi_rs5') },
+  { tier: 'A', slug: 'porsche_911', frames: rankedFrames('rank_a', 'porsche_911') }
+]
+
 export const loadSprites = () => {
   const createDirectionalSprites = (img, dirCount = 16) => {
     const w = img.naturalWidth || img.width
@@ -251,6 +276,8 @@ export const loadSprites = () => {
     return out
   }
 
+  const rankedLoads = RANKED_TARGET_MODELS.flatMap((m) => m.frames.map((src) => loadImage(src)))
+
   return Promise.all([
     loadImage('/assets/sprites/buildings.png'),
     loadImage('/assets/sprites/streets_1.png'),
@@ -260,8 +287,17 @@ export const loadSprites = () => {
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/1.png'),
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/2.png'),
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/3.png')
-  ]).then(([buildings, streets1, streets2, car, taxi, police1, police2, police3]) => {
+  ].concat(rankedLoads)).then((imgs) => {
+    const [buildings, streets1, streets2, car, taxi, police1, police2, police3] = imgs
     const dirCount = 16
+    const targetsByTier = {}
+    let p = 8
+    for (const m of RANKED_TARGET_MODELS) {
+      const frames = [imgs[p], imgs[p + 1], imgs[p + 2]]
+      p += 3
+      if (!targetsByTier[m.tier]) targetsByTier[m.tier] = {}
+      targetsByTier[m.tier][m.slug] = frames.map((f) => createDirectionalSprites(f, dirCount))
+    }
     return {
       buildings,
       streets1,
@@ -270,6 +306,7 @@ export const loadSprites = () => {
         dirCount,
         player: createDirectionalSprites(car, dirCount),
         target: createDirectionalSprites(taxi, dirCount),
+        targetsByTier,
         police: [police1, police2, police3].map((f) => createDirectionalSprites(f, dirCount))
       }
     }
