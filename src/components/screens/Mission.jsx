@@ -368,6 +368,7 @@ function Mission({ contract, onComplete, onExit }) {
   const showMiniGameRef = useRef(false)
   const [miniGameType, setMiniGameType] = useState('hotwire')
   const [map, setMap] = useState(null)
+  const [showMobileControls, setShowMobileControls] = useState(false)
 
   useEffect(() => {
     const randomSeed = Math.floor(Math.random() * 10000)
@@ -423,6 +424,66 @@ function Mission({ contract, onComplete, onExit }) {
   useEffect(() => {
     showMiniGameRef.current = showMiniGame
   }, [showMiniGame])
+
+  useEffect(() => {
+    const hasTouch =
+      typeof window !== 'undefined' &&
+      ('ontouchstart' in window || (navigator && (navigator.maxTouchPoints || 0) > 0))
+    setShowMobileControls(!!hasTouch)
+  }, [])
+
+  const setJoystick = useCallback((dx, dy) => {
+    const st = joystickStateRef.current
+    moveVecRef.current.x = dx / st.maxR
+    moveVecRef.current.y = dy / st.maxR
+    const el = joystickKnobRef.current
+    if (el) el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+  }, [])
+
+  const onJoystickDown = useCallback((e) => {
+    if (!showMobileControls) return
+    e.preventDefault()
+    const st = joystickStateRef.current
+    st.active = true
+    st.id = e.pointerId
+    st.startX = e.clientX
+    st.startY = e.clientY
+    setJoystick(0, 0)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [setJoystick, showMobileControls])
+
+  const onJoystickMove = useCallback((e) => {
+    const st = joystickStateRef.current
+    if (!st.active || st.id !== e.pointerId) return
+    e.preventDefault()
+    const rawDx = e.clientX - st.startX
+    const rawDy = e.clientY - st.startY
+    const len = Math.sqrt(rawDx * rawDx + rawDy * rawDy) || 1
+    const maxR = st.maxR
+    const s = Math.min(1, maxR / len)
+    setJoystick(rawDx * s, rawDy * s)
+  }, [setJoystick])
+
+  const onJoystickUp = useCallback((e) => {
+    const st = joystickStateRef.current
+    if (st.id !== e.pointerId) return
+    e.preventDefault()
+    st.active = false
+    st.id = null
+    setJoystick(0, 0)
+  }, [setJoystick])
+
+  const onFireDown = useCallback((e) => {
+    if (!showMobileControls) return
+    e.preventDefault()
+    fireHeldRef.current = true
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [showMobileControls])
+
+  const onFireUp = useCallback((e) => {
+    e.preventDefault()
+    fireHeldRef.current = false
+  }, [])
   
   const playerRef = useRef({
     x: map?.spawnPoints?.player?.x ? map.spawnPoints.player.x * TILE_SIZE + TILE_SIZE / 2 : 0,
@@ -457,6 +518,10 @@ function Mission({ contract, onComplete, onExit }) {
   const bulletsRef = useRef([])
   const gunRef = useRef({ shotsInMag: 0, reloadUntil: 0, lastShotAt: 0 })
   const guardGunRef = useRef({ lastShotAt: 0 })
+  const moveVecRef = useRef({ x: 0, y: 0 })
+  const fireHeldRef = useRef(false)
+  const joystickKnobRef = useRef(null)
+  const joystickStateRef = useRef({ active: false, id: null, startX: 0, startY: 0, maxR: 42 })
   
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -535,6 +600,12 @@ function Mission({ contract, onComplete, onExit }) {
         if (keysRef.current['s'] || keysRef.current['arrowdown']) dy = speed
         if (keysRef.current['a'] || keysRef.current['arrowleft']) dx = -speed
         if (keysRef.current['d'] || keysRef.current['arrowright']) dx = speed
+
+        const mv = moveVecRef.current
+        if (mv.x !== 0 || mv.y !== 0) {
+          dx += mv.x * speed
+          dy += mv.y * speed
+        }
       }
 
       player.vx = dx
@@ -677,10 +748,10 @@ function Mission({ contract, onComplete, onExit }) {
         }
 
         const spaceNow = !!(keysRef.current[' '] || keysRef.current['space'])
-        const spacePressed = spaceNow && !prevSpaceRef.current
         prevSpaceRef.current = spaceNow
+        const wantsFire = spaceNow || fireHeldRef.current
 
-        if (spacePressed && !isStunned && !player.hasCar) {
+        if (wantsFire && !isStunned && !player.hasCar) {
           if (now >= (gun.reloadUntil || 0) && now - (gun.lastShotAt || 0) > 170) {
             const dxg = guard.x - player.x
             const dyg = guard.y - player.y
@@ -690,8 +761,9 @@ function Mission({ contract, onComplete, onExit }) {
               gun.shotsInMag = (gun.shotsInMag || 0) + 1
               const muzzle = 26
               const bulletSpeed = 10.5
-              const sx = player.x + Math.cos(player.angle) * muzzle
-              const sy = player.y + Math.sin(player.angle) * muzzle
+              const shootAngle = fireHeldRef.current ? Math.atan2(dyg, dxg) : player.angle
+              const sx = player.x + Math.cos(shootAngle) * muzzle
+              const sy = player.y + Math.sin(shootAngle) * muzzle
               bulletsRef.current.push({
                 owner: 'player',
                 startX: sx,
@@ -699,8 +771,8 @@ function Mission({ contract, onComplete, onExit }) {
                 maxDist: 220,
                 x: sx,
                 y: sy,
-                vx: Math.cos(player.angle) * bulletSpeed,
-                vy: Math.sin(player.angle) * bulletSpeed,
+                vx: Math.cos(shootAngle) * bulletSpeed,
+                vy: Math.sin(shootAngle) * bulletSpeed,
                 bornAt: now
               })
 
@@ -1270,6 +1342,30 @@ function Mission({ contract, onComplete, onExit }) {
           height={MINIMAP_SIZE}
           className="minimap-canvas"
         />
+        {showMobileControls && (
+          <div className="mobile-controls">
+            <div
+              className="mobile-joystick"
+              onPointerDown={onJoystickDown}
+              onPointerMove={onJoystickMove}
+              onPointerUp={onJoystickUp}
+              onPointerCancel={onJoystickUp}
+            >
+              <div className="mobile-joystick-base" />
+              <div className="mobile-joystick-knob" ref={joystickKnobRef} />
+            </div>
+            <button
+              type="button"
+              className="mobile-fire"
+              onPointerDown={onFireDown}
+              onPointerUp={onFireUp}
+              onPointerCancel={onFireUp}
+              onPointerLeave={onFireUp}
+            >
+              FIRE
+            </button>
+          </div>
+        )}
       </div>
       
       <div className="controls-hint">
