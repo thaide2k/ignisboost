@@ -1108,6 +1108,7 @@ function Mission({ contract, onComplete, onExit }) {
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
       ctx.setTransform(zoom, 0, 0, zoom, -cam.x * zoom, -cam.y * zoom)
+      ctx.imageSmoothingEnabled = false
 
       const startTileX = Math.floor(cam.x / TILE_SIZE)
       const startTileY = Math.floor(cam.y / TILE_SIZE)
