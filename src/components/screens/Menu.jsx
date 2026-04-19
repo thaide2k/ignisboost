@@ -16,9 +16,15 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
   const [contracts, setContracts] = useState([])
   const [selectedContract, setSelectedContract] = useState(null)
   const [activeNav, setActiveNav] = useState('contracts')
+  const [failedSprites, setFailedSprites] = useState({})
 
   useEffect(() => {
-    setContracts(generateContracts())
+    const list = generateContracts()
+    setContracts(list)
+    const debug = typeof window !== 'undefined' && window.location.search.includes('debugSprites=1')
+    if (debug) {
+      console.log('[debugSprites] contracts', list.map((c) => ({ id: c.id, tier: c.tier, targetModel: c.targetModel })))
+    }
   }, [])
 
   const handleStart = () => {
@@ -36,7 +42,7 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
     <div className="menu-layout">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <img src="/logo.png" alt="IgnisBoost" className="sidebar-logo" />
+          <img src="logo.png" alt="IgnisBoost" className="sidebar-logo" />
           <span className="sidebar-title">IgnisBoost</span>
         </div>
 
@@ -102,6 +108,7 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
                 {contracts.map((contract) => (
                   (() => {
                     const targetModel = getTargetModelForContract(contract)
+                    const showEmoji = failedSprites[contract.id] || !targetModel?.preview
                     return (
                   <div
                     key={contract.id}
@@ -118,8 +125,17 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
                       <span className="contract-location">{contract.location}</span>
                     </div>
                     <div className="car-visual">
-                      {targetModel?.preview ? (
-                        <img className="car-sprite" src={targetModel.preview} alt={targetModel.name} />
+                      {!showEmoji ? (
+                        <img
+                          className="car-sprite"
+                          src={targetModel.preview}
+                          alt={targetModel.name}
+                          onError={() => {
+                            const debug = typeof window !== 'undefined' && window.location.search.includes('debugSprites=1')
+                            if (debug) console.log('[debugSprites] image failed', { contractId: contract.id, src: targetModel.preview, targetModel })
+                            setFailedSprites((prev) => ({ ...prev, [contract.id]: true }))
+                          }}
+                        />
                       ) : (
                         <span 
                           className="car-emoji"

@@ -415,6 +415,16 @@ function Mission({ contract, onComplete, onExit }) {
     if (slug && byTier?.[slug]) return byTier[slug]
     return sprites?.vehicles?.target
   }, [sprites, contract?.tier, targetModel?.slug])
+  useEffect(() => {
+    const debug = typeof window !== 'undefined' && window.location.search.includes('debugSprites=1')
+    if (!debug) return
+    console.log('[debugSprites] target resolved', {
+      contractTier: contract?.tier,
+      contractTargetModel: contract?.targetModel,
+      resolvedTargetModel: targetModel,
+      usingRanked: !!(contract?.tier && targetModel?.slug && sprites?.vehicles?.targetsByTier?.[contract.tier]?.[targetModel.slug])
+    })
+  }, [contract?.tier, contract?.targetModel, targetModel, sprites])
   
   useEffect(() => {
     const handleResize = () => {
@@ -427,6 +437,14 @@ function Mission({ contract, onComplete, onExit }) {
   useEffect(() => {
     loadSprites().then((loaded) => {
       setSprites(loaded)
+      const debug = typeof window !== 'undefined' && window.location.search.includes('debugSprites=1')
+      if (debug) {
+        console.log('[debugSprites] sprites loaded', {
+          tier: contract?.tier,
+          targetModel: contract?.targetModel,
+          targetsByTier: Object.fromEntries(Object.entries(loaded?.vehicles?.targetsByTier || {}).map(([t, m]) => [t, Object.keys(m)]))
+        })
+      }
     }).catch(() => {})
   }, [])
 

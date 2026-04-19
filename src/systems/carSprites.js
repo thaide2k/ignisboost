@@ -45,7 +45,7 @@ export const getCarColor = (carType, index = 0) => {
 }
 
 const ranked = (rank, slug) =>
-  `/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/${rank}/${slug}_animation/1.png`
+  `assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/ranked_models/${rank}/${slug}_animation/1.png`
 
 const RANKED_TARGET_MODELS = {
   D: [
