@@ -625,6 +625,53 @@ function Mission({ contract, onComplete, onExit }) {
         if (!pl.invulnUntil || now > pl.invulnUntil) pl.invuln = false
         if (!gd.invulnUntil || now > gd.invulnUntil) gd.invuln = false
 
+        const guardRunSpeed = 4.8
+        const guardGravity = 0.85
+        const guardJumpVel = -12.8
+        const guardMinX = Math.min(w - 60, pl.x + 140)
+        const guardMaxX = w - 60
+
+        const nowMs = now
+        if (gd.aiNextAt == null) gd.aiNextAt = 0
+        if (gd.aiDir == null) gd.aiDir = 0
+        if (gd.aiNextAt < nowMs) {
+          const preferredX = clamp(pl.x + 260, w * 0.55, w - 80)
+          const dx = preferredX - gd.x
+          if (Math.abs(dx) > 40) gd.aiDir = dx > 0 ? 1 : -1
+          else gd.aiDir = Math.random() < 0.5 ? 0 : (Math.random() < 0.5 ? -1 : 1)
+          gd.aiNextAt = nowMs + 260 + Math.random() * 260
+        }
+
+        let wantsJump = false
+        if (gd.onGround) {
+          for (const b of duelBullets) {
+            if (b.owner !== 'player') continue
+            const dx = gd.x - b.x
+            if (dx < 0 || dx > 170) continue
+            if (Math.abs(b.y - (groundY - 22)) < 18) {
+              wantsJump = true
+              break
+            }
+          }
+        }
+
+        if (gd.onGround && wantsJump && (!gd.jumpUntil || nowMs > gd.jumpUntil)) {
+          gd.vy = guardJumpVel
+          gd.onGround = false
+          gd.jumpUntil = nowMs + 500
+        }
+
+        gd.vx = gd.aiDir * guardRunSpeed
+        gd.vy += guardGravity * dtFactor
+        gd.x += gd.vx * dtFactor
+        gd.y += gd.vy * dtFactor
+        gd.x = clamp(gd.x, guardMinX, guardMaxX)
+        if (gd.y >= groundY) {
+          gd.y = groundY
+          gd.vy = 0
+          gd.onGround = true
+        }
+
         const runSpeed = 5.4
         pl.vx = left ? -runSpeed : right ? runSpeed : 0
         const gravity = 0.85
@@ -658,7 +705,7 @@ function Mission({ contract, onComplete, onExit }) {
           gd.lastShotAt = now
           gd.shotsInMag = (gd.shotsInMag || 0) + 1
           const high = (gd.shotsInMag % 2) === 0
-          const by = high ? groundY - 118 : groundY - 22
+          const by = high ? gd.y - 118 : gd.y - 22
           duelBullets.push({ owner: 'guard', x: gd.x - 26, y: by, vx: -9.8, vy: 0, bornAt: now })
           if (gd.shotsInMag >= 6) {
             gd.shotsInMag = 0
@@ -905,13 +952,19 @@ function Mission({ contract, onComplete, onExit }) {
             guard: {
               x: Math.floor(w * 0.76),
               y: groundY,
+              vx: 0,
+              vy: 0,
+              onGround: true,
               hp: 3,
               invuln: false,
               invulnUntil: 0,
               lastShotAt: 0,
               shotsInMag: 0,
               reloadUntil: 0,
-              reloadTotal: 680
+              reloadTotal: 680,
+              aiNextAt: 0,
+              aiDir: 0,
+              jumpUntil: 0
             },
             bullets: []
           }
