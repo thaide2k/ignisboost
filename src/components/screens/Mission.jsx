@@ -566,6 +566,11 @@ function Mission({ contract, onComplete, onExit }) {
           const bx = b.x + b.vx * dtFactor
           const by = b.y + b.vy * dtFactor
           if (!isWalkable(bx, by, map)) continue
+          if (b.maxDist != null) {
+            const dx0 = bx - (b.startX ?? b.x)
+            const dy0 = by - (b.startY ?? b.y)
+            if (dx0 * dx0 + dy0 * dy0 > b.maxDist * b.maxDist) continue
+          }
 
           let hit = false
           if (b.owner === 'player' && guard && guard.hp > 0 && (!guard.invulnUntil || now > guard.invulnUntil)) {
@@ -659,6 +664,9 @@ function Mission({ contract, onComplete, onExit }) {
             const bulletSpeed = 7.8
             bulletsRef.current.push({
               owner: 'guard',
+              startX: guard.x + nx * muzzle,
+              startY: guard.y + ny * muzzle,
+              maxDist: 240,
               x: guard.x + nx * muzzle,
               y: guard.y + ny * muzzle,
               vx: nx * bulletSpeed,
@@ -674,23 +682,33 @@ function Mission({ contract, onComplete, onExit }) {
 
         if (spacePressed && !isStunned && !player.hasCar) {
           if (now >= (gun.reloadUntil || 0) && now - (gun.lastShotAt || 0) > 170) {
-            gun.lastShotAt = now
-            gun.shotsInMag = (gun.shotsInMag || 0) + 1
-            const muzzle = 26
-            const bulletSpeed = 10.5
-            bulletsRef.current.push({
-              owner: 'player',
-              x: player.x + Math.cos(player.angle) * muzzle,
-              y: player.y + Math.sin(player.angle) * muzzle,
-              vx: Math.cos(player.angle) * bulletSpeed,
-              vy: Math.sin(player.angle) * bulletSpeed,
-              bornAt: now
-            })
+            const dxg = guard.x - player.x
+            const dyg = guard.y - player.y
+            const distToGuard = Math.sqrt(dxg * dxg + dyg * dyg)
+            if (distToGuard <= 220) {
+              gun.lastShotAt = now
+              gun.shotsInMag = (gun.shotsInMag || 0) + 1
+              const muzzle = 26
+              const bulletSpeed = 10.5
+              const sx = player.x + Math.cos(player.angle) * muzzle
+              const sy = player.y + Math.sin(player.angle) * muzzle
+              bulletsRef.current.push({
+                owner: 'player',
+                startX: sx,
+                startY: sy,
+                maxDist: 220,
+                x: sx,
+                y: sy,
+                vx: Math.cos(player.angle) * bulletSpeed,
+                vy: Math.sin(player.angle) * bulletSpeed,
+                bornAt: now
+              })
 
-            if (gun.shotsInMag >= 5) {
-              gun.shotsInMag = 0
-              gun.reloadTotal = 550
-              gun.reloadUntil = now + gun.reloadTotal
+              if (gun.shotsInMag >= 5) {
+                gun.shotsInMag = 0
+                gun.reloadTotal = 550
+                gun.reloadUntil = now + gun.reloadTotal
+              }
             }
           }
         }
