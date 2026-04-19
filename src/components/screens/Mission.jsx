@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, generateMap, getTileColor, isWalkable, getBuildingVariantColor, loadSprites, getBuildingSprite } from '../../systems/mapSystem'
 import { calculateRewards } from '../../systems/missionSystem'
 import { getHeatColor, getPoliceBehavior } from '../../systems/heatSystem'
+import { getTargetModelForContract } from '../../systems/carSprites'
 import CarStealMiniGame from '../game/CarStealMiniGame'
 import PathFindGame from '../game/PathFindGame'
 import './Mission.css'
@@ -13,12 +14,6 @@ const hash01 = (x, y, seed = 1) => {
   t = (t ^ (t >>> 13)) | 0
   t = Math.imul(t, 1274126177)
   return (((t >>> 0) & 0xffffff) / 0x1000000)
-}
-
-const strHash = (s) => {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0
-  return h >>> 0
 }
 
 const roundRect = (ctx, x, y, w, h, r) => {
@@ -412,16 +407,14 @@ function Mission({ contract, onComplete, onExit }) {
   const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight })
   
   const cameraRef = useRef({ x: 0, y: 0 })
+  const targetModel = useMemo(() => getTargetModelForContract(contract), [contract])
   const targetVehicleSprite = useMemo(() => {
-    const byTier = sprites?.vehicles?.targetsByTier?.[contract?.tier]
-    if (!byTier) return sprites?.vehicles?.target
-    const models = Object.keys(byTier)
-    if (models.length === 0) return sprites?.vehicles?.target
-    const seed = strHash(String(contract?.id || '')) + strHash(String(contract?.tier || '')) + (contract?.reward || 0)
-    const idx = Math.floor(hash01(models.length, contract?.timeLimit || 0, seed) * models.length)
-    const key = models[clamp(idx, 0, models.length - 1)]
-    return byTier[key]
-  }, [sprites, contract])
+    const tier = contract?.tier
+    const slug = targetModel?.slug
+    const byTier = tier ? sprites?.vehicles?.targetsByTier?.[tier] : null
+    if (slug && byTier?.[slug]) return byTier[slug]
+    return sprites?.vehicles?.target
+  }, [sprites, contract?.tier, targetModel?.slug])
   
   useEffect(() => {
     const handleResize = () => {

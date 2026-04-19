@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { generateContracts, getTierColor } from '../../systems/contractSystem'
-import { getCarEmoji, getCarColor } from '../../systems/carSprites'
+import { getCarEmoji, getCarColor, getTargetModelForContract } from '../../systems/carSprites'
 import './Menu.css'
 
 const NAV_ITEMS = [
@@ -100,6 +100,9 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
             <>
               <div className="contracts-grid">
                 {contracts.map((contract) => (
+                  (() => {
+                    const targetModel = getTargetModelForContract(contract)
+                    return (
                   <div
                     key={contract.id}
                     className={`contract-card ${selectedContract?.id === contract.id ? 'selected' : ''}`}
@@ -115,15 +118,20 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
                       <span className="contract-location">{contract.location}</span>
                     </div>
                     <div className="car-visual">
-                      <span 
-                        className="car-emoji"
-                        style={{ color: getCarColor(contract.carType) }}
-                      >
-                        {getCarEmoji(contract.carType)}
-                      </span>
+                      {targetModel?.preview ? (
+                        <img className="car-sprite" src={targetModel.preview} alt={targetModel.name} />
+                      ) : (
+                        <span 
+                          className="car-emoji"
+                          style={{ color: getCarColor(contract.carType) }}
+                        >
+                          {getCarEmoji(contract.carType)}
+                        </span>
+                      )}
                     </div>
                     <div className="contract-body">
-                      <h3 className="car-type">{contract.carType}</h3>
+                      <h3 className="car-type">{targetModel?.name || contract.carType}</h3>
+                      <div className="car-subtype">{contract.carType}</div>
                       <div className="contract-details">
                         <div className="detail-row">
                           <span className="detail-label">Recompensa</span>
@@ -147,6 +155,8 @@ function Menu({ playerStats, profile, onStartMission, onEditProfile }) {
                       </div>
                     </div>
                   </div>
+                    )
+                  })()
                 ))}
               </div>
 
