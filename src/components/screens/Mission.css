@@ -195,6 +195,30 @@
   transform: translate3d(0, 0, 0);
 }
 
+.mobile-jump {
+  position: absolute;
+  right: 28px;
+  bottom: 184px;
+  width: 110px;
+  height: 72px;
+  pointer-events: auto;
+  touch-action: none;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: radial-gradient(80px 60px at 30% 30%, rgba(59, 130, 246, 0.28), rgba(0, 0, 0, 0.25));
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
+}
+
+.mobile-jump:active {
+  transform: translateY(1px) scale(0.99);
+  background: radial-gradient(80px 60px at 30% 30%, rgba(59, 130, 246, 0.4), rgba(0, 0, 0, 0.25));
+}
+
 .mobile-fire {
   position: absolute;
   right: 18px;

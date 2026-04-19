@@ -484,6 +484,18 @@ function Mission({ contract, onComplete, onExit }) {
     e.preventDefault()
     fireHeldRef.current = false
   }, [])
+
+  const onJumpDown = useCallback((e) => {
+    if (!showMobileControls) return
+    e.preventDefault()
+    jumpQueuedRef.current = true
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [showMobileControls])
+
+  const onJumpUp = useCallback((e) => {
+    e.preventDefault()
+    jumpQueuedRef.current = false
+  }, [])
   
   const playerRef = useRef({
     x: map?.spawnPoints?.player?.x ? map.spawnPoints.player.x * TILE_SIZE + TILE_SIZE / 2 : 0,
@@ -520,6 +532,9 @@ function Mission({ contract, onComplete, onExit }) {
   const guardGunRef = useRef({ lastShotAt: 0 })
   const moveVecRef = useRef({ x: 0, y: 0 })
   const fireHeldRef = useRef(false)
+  const jumpQueuedRef = useRef(false)
+  const prevJumpKeyRef = useRef(false)
+  const duelRef = useRef({ active: false })
   const joystickKnobRef = useRef(null)
   const joystickStateRef = useRef({ active: false, id: null, startX: 0, startY: 0, maxR: 42 })
   
@@ -584,6 +599,184 @@ function Mission({ contract, onComplete, onExit }) {
       const guard = guardRef.current
       const bullets = bulletsRef.current
       const gun = gunRef.current
+      const duel = duelRef.current
+
+      if (duel.active) {
+        const w = canvas.width
+        const h = canvas.height
+        const groundY = duel.groundY ?? Math.floor(h * 0.74)
+        duel.groundY = groundY
+        duel.w = w
+        duel.h = h
+
+        const mv = moveVecRef.current
+        const left = (keysRef.current['a'] || keysRef.current['arrowleft'] || mv.x < -0.2)
+        const right = (keysRef.current['d'] || keysRef.current['arrowright'] || mv.x > 0.2)
+        const fire = (!!(keysRef.current[' '] || keysRef.current['space']) || fireHeldRef.current)
+        const jumpKey = !!(keysRef.current['arrowup'])
+        const jumpPressed = (jumpKey && !prevJumpKeyRef.current) || !!jumpQueuedRef.current
+        prevJumpKeyRef.current = jumpKey
+        if (jumpQueuedRef.current) jumpQueuedRef.current = false
+
+        const pl = duel.player
+        const gd = duel.guard
+        const duelBullets = duel.bullets
+
+        if (!pl.invulnUntil || now > pl.invulnUntil) pl.invuln = false
+        if (!gd.invulnUntil || now > gd.invulnUntil) gd.invuln = false
+
+        const runSpeed = 5.4
+        pl.vx = left ? -runSpeed : right ? runSpeed : 0
+        const gravity = 0.85
+        if (jumpPressed && pl.onGround) {
+          pl.vy = -13.5
+          pl.onGround = false
+        }
+        pl.vy += gravity * dtFactor
+        pl.x += pl.vx * dtFactor
+        pl.y += pl.vy * dtFactor
+        pl.x = clamp(pl.x, 60, w - 60)
+        if (pl.y >= groundY) {
+          pl.y = groundY
+          pl.vy = 0
+          pl.onGround = true
+        }
+
+        if (fire && now - (pl.lastShotAt || 0) > 180 && now >= (pl.reloadUntil || 0)) {
+          pl.lastShotAt = now
+          pl.shotsInMag = (pl.shotsInMag || 0) + 1
+          const muzzleY = pl.y - 44
+          duelBullets.push({ owner: 'player', x: pl.x + 26, y: muzzleY, vx: 12.5, vy: 0, bornAt: now })
+          if (pl.shotsInMag >= 5) {
+            pl.shotsInMag = 0
+            pl.reloadTotal = 520
+            pl.reloadUntil = now + pl.reloadTotal
+          }
+        }
+
+        if (now - (gd.lastShotAt || 0) > 620 && now >= (gd.reloadUntil || 0)) {
+          gd.lastShotAt = now
+          gd.shotsInMag = (gd.shotsInMag || 0) + 1
+          const high = (gd.shotsInMag % 2) === 0
+          const by = high ? groundY - 118 : groundY - 22
+          duelBullets.push({ owner: 'guard', x: gd.x - 26, y: by, vx: -9.8, vy: 0, bornAt: now })
+          if (gd.shotsInMag >= 6) {
+            gd.shotsInMag = 0
+            gd.reloadTotal = 680
+            gd.reloadUntil = now + gd.reloadTotal
+          }
+        }
+
+        const next = []
+        for (const b of duelBullets) {
+          if (now - b.bornAt > 1200) continue
+          const bx = b.x + b.vx * dtFactor
+          const by = b.y + b.vy * dtFactor
+          if (bx < -40 || bx > w + 40) continue
+          let hit = false
+
+          if (b.owner === 'player' && !gd.invuln) {
+            const gw = 56
+            const gh = 76
+            const gx0 = gd.x - gw / 2
+            const gy0 = gd.y - gh
+            if (bx >= gx0 && bx <= gx0 + gw && by >= gy0 && by <= gy0 + gh) {
+              hit = true
+              gd.hp -= 1
+              gd.invuln = true
+              gd.invulnUntil = now + 260
+              if (gd.hp <= 0) {
+                gd.hp = 0
+                duel.active = false
+                guardRef.current.hp = 0
+              }
+            }
+          } else if (b.owner === 'guard' && !pl.invuln) {
+            const pw = 50
+            const ph = 76
+            const px0 = pl.x - pw / 2
+            const py0 = pl.y - ph
+            if (bx >= px0 && bx <= px0 + pw && by >= py0 && by <= py0 + ph) {
+              hit = true
+              pl.hp -= 1
+              pl.invuln = true
+              pl.invulnUntil = now + 320
+              if (pl.hp <= 0) {
+                pl.hp = 0
+                duel.active = false
+                setHeat((v) => Math.min(5, v + 0.6))
+              }
+            }
+          }
+
+          if (!hit) next.push({ ...b, x: bx, y: by })
+        }
+        duel.bullets = next
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+
+        ctx.fillStyle = '#0b1020'
+        ctx.fillRect(0, 0, w, h)
+        ctx.fillStyle = '#101827'
+        ctx.fillRect(0, groundY, w, h - groundY)
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'
+        for (let i = 0; i < 40; i++) {
+          const x = (i * 37) % w
+          ctx.fillRect(x, groundY + ((i * 13) % 70), 18, 2)
+        }
+
+        const drawDuelChar = (ent, color) => {
+          const w0 = 52
+          const h0 = 76
+          const x0 = ent.x - w0 / 2
+          const y0 = ent.y - h0
+          if (ent.invuln && Math.floor(now / 70) % 2 === 0) return
+          ctx.fillStyle = 'rgba(0,0,0,0.35)'
+          ctx.fillRect(x0 + 6, ent.y - 10, w0 - 12, 10)
+          ctx.fillStyle = color
+          roundRect(ctx, x0, y0, w0, h0, 10)
+          ctx.fill()
+          ctx.fillStyle = 'rgba(255,255,255,0.08)'
+          ctx.fillRect(x0 + 6, y0 + 10, w0 - 12, 10)
+        }
+
+        const drawHp = (x, y, hp, maxHp, color) => {
+          for (let i = 0; i < maxHp; i++) {
+            ctx.globalAlpha = i < hp ? 1 : 0.22
+            ctx.fillStyle = color
+            roundRect(ctx, x + i * 18, y, 14, 10, 3)
+            ctx.fill()
+          }
+          ctx.globalAlpha = 1
+        }
+
+        drawDuelChar(pl, '#22c55e')
+        drawDuelChar(gd, '#ef4444')
+
+        ctx.fillStyle = '#fbbf24'
+        for (const b of duel.bullets) {
+          ctx.fillStyle = b.owner === 'guard' ? '#ef4444' : '#fbbf24'
+          ctx.fillRect(b.x - 3, b.y - 2, 6, 4)
+        }
+
+        drawHp(20, 18, pl.hp, 3, '#22c55e')
+        drawHp(w - 20 - 3 * 18, 18, gd.hp, 3, '#ef4444')
+
+        if (pl.reloadUntil && now < pl.reloadUntil) {
+          const total = pl.reloadTotal || 520
+          const t = 1 - clamp((pl.reloadUntil - now) / total, 0, 1)
+          ctx.fillStyle = 'rgba(0,0,0,0.65)'
+          roundRect(ctx, 20, 40, 90, 8, 4)
+          ctx.fill()
+          ctx.fillStyle = '#fbbf24'
+          roundRect(ctx, 21, 41, 88 * t, 6, 3)
+          ctx.fill()
+        }
+
+        animationRef.current = requestAnimationFrame(gameLoop)
+        return
+      }
       
       const zoomBase = player.hasCar ? 0.86 : 0.92
       const zoom = zoomBase * 2
@@ -682,111 +875,49 @@ function Mission({ contract, onComplete, onExit }) {
         bulletsRef.current = next
       }
 
-      if (guard && guard.hp > 0) {
-        const toCarDx = (targetCar.x - player.x)
-        const toCarDy = (targetCar.y - player.y)
-        const distToCar = Math.sqrt(toCarDx * toCarDx + toCarDy * toCarDy)
-        const aggro = distToCar < 160
-
-        if (aggro) guard.state = 'CHASE'
-        else guard.state = 'GUARD'
-
-        const gStunned = guard.stunUntil && now < guard.stunUntil
-        let gvx = 0
-        let gvy = 0
-
-        const goalX = guard.state === 'CHASE' ? player.x : guard.homeX
-        const goalY = guard.state === 'CHASE' ? player.y : guard.homeY
-        const gdx = goalX - guard.x
-        const gdy = goalY - guard.y
-        const gdist = Math.sqrt(gdx * gdx + gdy * gdy)
-
-        if (!gStunned && gdist > 1) {
-          const gs = 0.55 * dtFactor
-          gvx = (gdx / gdist) * gs
-          gvy = (gdy / gdist) * gs
-        }
-
-        if (guard.knockUntil && now < guard.knockUntil) {
-          gvx += guard.knockVx * dtFactor
-          gvy += guard.knockVy * dtFactor
-        }
-
-        const gNewX = guard.x + gvx
-        const gNewY = guard.y + gvy
-        if (isWalkable(gNewX, guard.y, map)) guard.x = gNewX
-        if (isWalkable(guard.x, gNewY, map)) guard.y = gNewY
-
-        if (aggro && !player.hasCar && !gStunned) {
-          const gg = guardGunRef.current
-          if (now - (gg.lastShotAt || 0) > 700) {
-            gg.lastShotAt = now
-            const dxp = player.x - guard.x
-            const dyp = player.y - guard.y
-            const dist = Math.sqrt(dxp * dxp + dyp * dyp) || 1
-            const baseAng = Math.atan2(dyp, dxp)
-            const spreadBase = 0.22
-            const spreadScale = clamp(dist / 240, 0.35, 1.2)
-            const spread = (Math.random() - 0.5) * spreadBase * spreadScale
-            const ang = baseAng + spread
-            const nx = Math.cos(ang)
-            const ny = Math.sin(ang)
-            const muzzle = 22
-            const bulletSpeed = 7.8
-            bulletsRef.current.push({
-              owner: 'guard',
-              startX: guard.x + nx * muzzle,
-              startY: guard.y + ny * muzzle,
-              maxDist: 240,
-              x: guard.x + nx * muzzle,
-              y: guard.y + ny * muzzle,
-              vx: nx * bulletSpeed,
-              vy: ny * bulletSpeed,
-              bornAt: now
-            })
+      if (guard && guard.hp > 0 && !player.hasCar && !duelRef.current.active) {
+        const dxg = guard.x - player.x
+        const dyg = guard.y - player.y
+        const distToGuard = Math.sqrt(dxg * dxg + dyg * dyg)
+        if (distToGuard < 92) {
+          const w = canvas.width
+          const h = canvas.height
+          const groundY = Math.floor(h * 0.74)
+          duelRef.current = {
+            active: true,
+            w,
+            h,
+            groundY,
+            player: {
+              x: Math.floor(w * 0.24),
+              y: groundY,
+              vx: 0,
+              vy: 0,
+              onGround: true,
+              hp: 3,
+              invuln: false,
+              invulnUntil: 0,
+              lastShotAt: 0,
+              shotsInMag: 0,
+              reloadUntil: 0,
+              reloadTotal: 520
+            },
+            guard: {
+              x: Math.floor(w * 0.76),
+              y: groundY,
+              hp: 3,
+              invuln: false,
+              invulnUntil: 0,
+              lastShotAt: 0,
+              shotsInMag: 0,
+              reloadUntil: 0,
+              reloadTotal: 680
+            },
+            bullets: []
           }
+          fireHeldRef.current = false
+          jumpQueuedRef.current = false
         }
-
-        const spaceNow = !!(keysRef.current[' '] || keysRef.current['space'])
-        prevSpaceRef.current = spaceNow
-        const wantsFire = spaceNow || fireHeldRef.current
-
-        if (wantsFire && !isStunned && !player.hasCar) {
-          if (now >= (gun.reloadUntil || 0) && now - (gun.lastShotAt || 0) > 170) {
-            const dxg = guard.x - player.x
-            const dyg = guard.y - player.y
-            const distToGuard = Math.sqrt(dxg * dxg + dyg * dyg)
-            if (distToGuard <= 220) {
-              gun.lastShotAt = now
-              gun.shotsInMag = (gun.shotsInMag || 0) + 1
-              const muzzle = 26
-              const bulletSpeed = 10.5
-              const shootAngle = fireHeldRef.current ? Math.atan2(dyg, dxg) : player.angle
-              const sx = player.x + Math.cos(shootAngle) * muzzle
-              const sy = player.y + Math.sin(shootAngle) * muzzle
-              bulletsRef.current.push({
-                owner: 'player',
-                startX: sx,
-                startY: sy,
-                maxDist: 220,
-                x: sx,
-                y: sy,
-                vx: Math.cos(shootAngle) * bulletSpeed,
-                vy: Math.sin(shootAngle) * bulletSpeed,
-                bornAt: now
-              })
-
-              if (gun.shotsInMag >= 5) {
-                gun.shotsInMag = 0
-                gun.reloadTotal = 550
-                gun.reloadUntil = now + gun.reloadTotal
-              }
-            }
-          }
-        }
-      } else {
-        const spaceNow = !!(keysRef.current[' '] || keysRef.current['space'])
-        prevSpaceRef.current = spaceNow
       }
       
       if (!player.hasCar && targetCar.exists) {
@@ -1354,6 +1485,16 @@ function Mission({ contract, onComplete, onExit }) {
               <div className="mobile-joystick-base" />
               <div className="mobile-joystick-knob" ref={joystickKnobRef} />
             </div>
+            <button
+              type="button"
+              className="mobile-jump"
+              onPointerDown={onJumpDown}
+              onPointerUp={onJumpUp}
+              onPointerCancel={onJumpUp}
+              onPointerLeave={onJumpUp}
+            >
+              JUMP
+            </button>
             <button
               type="button"
               className="mobile-fire"
