@@ -88,10 +88,26 @@ const hash01 = (x, y, seed = 1) => {
 }
 
 export const getTargetModelForContract = (contract) => {
+  if (contract?.targetModel?.tier && contract?.targetModel?.slug && contract?.targetModel?.name) {
+    const tm = contract.targetModel
+    return {
+      tier: tm.tier,
+      slug: tm.slug,
+      name: tm.name,
+      preview: tm.preview || ranked(`rank_${String(tm.tier).toLowerCase()}`, tm.slug)
+    }
+  }
   const tier = contract?.tier
   const list = RANKED_TARGET_MODELS[tier]
   if (!list || list.length === 0) return null
   const seed = strHash(String(contract?.id || '')) + strHash(String(contract?.tier || '')) + (contract?.reward || 0)
   const idx = Math.floor(hash01(list.length, contract?.timeLimit || 0, seed) * list.length)
+  return list[Math.max(0, Math.min(list.length - 1, idx))]
+}
+
+export const pickTargetModelForTier = (tier) => {
+  const list = RANKED_TARGET_MODELS[tier]
+  if (!list || list.length === 0) return null
+  const idx = Math.floor(Math.random() * list.length)
   return list[Math.max(0, Math.min(list.length - 1, idx))]
 }

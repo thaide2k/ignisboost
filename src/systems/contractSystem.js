@@ -1,4 +1,5 @@
 import { TIER_ORDER } from './gameState'
+import { pickTargetModelForTier } from './carSprites'
 
 export const generateContracts = () => {
   const tiers = ['D', 'D', 'C', 'C', 'B']
@@ -35,10 +36,12 @@ export const createContract = (tier, id) => {
   const tierIndex = TIER_ORDER.indexOf(tier)
   const difficultyMultiplier = 1 + (tierIndex * 0.3)
   const randomFactor = 0.8 + Math.random() * 0.4
+  const targetModel = pickTargetModelForTier(tier)
 
   return {
     id: `contract-${id}-${Date.now()}`,
     tier,
+    ...(targetModel ? { targetModel } : {}),
     reward: Math.floor(baseReward[tier] * randomFactor),
     heatLevel: baseHeat[tier],
     difficulty: tierIndex + 1,
