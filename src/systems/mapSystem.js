@@ -405,6 +405,13 @@ export const loadSprites = () => {
         )
       : null
     if (debug) {
+      console.log('[debugSprites] playerWalk loaded', {
+        ok: !!playerWalk,
+        frames: playerWalk?.length || 0,
+        dirs: playerWalk?.[0]?.length || 0
+      })
+    }
+    if (debug) {
       console.log('[debugSprites] loadSprites targetsByTier', Object.fromEntries(Object.entries(rankedTargets).map(([t, m]) => [t, Object.keys(m)])))
     }
     return {
