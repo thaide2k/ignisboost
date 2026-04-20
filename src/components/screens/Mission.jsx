@@ -403,6 +403,7 @@ function Mission({ contract, onComplete, onExit }) {
     }
   }, [])
   const [sprites, setSprites] = useState(null)
+  const spritesRef = useRef(null)
   const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight })
   
   const cameraRef = useRef({ x: 0, y: 0 })
@@ -426,6 +427,10 @@ function Mission({ contract, onComplete, onExit }) {
       setSprites(loaded)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    spritesRef.current = sprites
+  }, [sprites])
 
   useEffect(() => {
     showMiniGameRef.current = showMiniGame
@@ -606,6 +611,13 @@ function Mission({ contract, onComplete, onExit }) {
       const bullets = bulletsRef.current
       const gun = gunRef.current
       const duel = duelRef.current
+      const sprites = spritesRef.current
+      const tier = contract?.tier
+      const slug = contract?.targetModel?.slug
+      const currentTargetVehicleSprite =
+        tier && slug && sprites?.vehicles?.targetsByTier?.[tier]?.[slug]
+          ? sprites.vehicles.targetsByTier[tier][slug]
+          : sprites?.vehicles?.target
 
       if (duel.active) {
         const w = canvas.width
@@ -1264,7 +1276,7 @@ function Mission({ contract, onComplete, onExit }) {
       
       if (!player.hasCar && targetCar.exists) {
         const pulse = 0.5 + 0.5 * Math.sin(now / 220)
-        if (!drawVehicleSprite(ctx, targetCar.x, targetCar.y, Math.PI / 2, targetVehicleSprite, now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })) {
+        if (!drawVehicleSprite(ctx, targetCar.x, targetCar.y, Math.PI / 2, currentTargetVehicleSprite, now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })) {
           drawCar(ctx, targetCar.x, targetCar.y, Math.PI / 2, '#ff6b35', now, { highlight: `rgba(255,107,53,${0.25 + pulse * 0.35})` })
         }
       }
@@ -1299,7 +1311,7 @@ function Mission({ contract, onComplete, onExit }) {
       })
       
       if (player.hasCar) {
-        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, targetVehicleSprite, now, { size: 68 })) {
+        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, currentTargetVehicleSprite, now, { size: 68 })) {
           drawCar(ctx, player.x, player.y, player.angle, '#ff6b35', now, { w: 30, h: 16 })
         }
       } else {
