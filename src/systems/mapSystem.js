@@ -286,36 +286,50 @@ export const loadSprites = () => {
   }
 
   const cropSquareCanvas = (c) => {
-    const ctx = c.getContext('2d')
     const w = c.width
     const h = c.height
-    const img = ctx.getImageData(0, 0, w, h)
-    const data = img.data
-    let x0 = w
-    let y0 = h
-    let x1 = -1
-    let y1 = -1
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const a = data[(y * w + x) * 4 + 3]
-        if (a <= 8) continue
-        if (x < x0) x0 = x
-        if (y < y0) y0 = y
-        if (x > x1) x1 = x
-        if (y > y1) y1 = y
-      }
+    const s0 = Math.max(w, h)
+    const fallback = () => {
+      const out = document.createElement('canvas')
+      out.width = s0
+      out.height = s0
+      const octx = out.getContext('2d')
+      octx.imageSmoothingEnabled = false
+      octx.drawImage(c, 0, 0, w, h, (s0 - w) / 2, (s0 - h) / 2, w, h)
+      return out
     }
-    if (x1 < x0 || y1 < y0) return null
-    const bw = x1 - x0 + 1
-    const bh = y1 - y0 + 1
-    const s = Math.max(bw, bh)
-    const out = document.createElement('canvas')
-    out.width = s
-    out.height = s
-    const octx = out.getContext('2d')
-    octx.imageSmoothingEnabled = false
-    octx.drawImage(c, x0, y0, bw, bh, (s - bw) / 2, (s - bh) / 2, bw, bh)
-    return out
+    try {
+      const ctx = c.getContext('2d')
+      const img = ctx.getImageData(0, 0, w, h)
+      const data = img.data
+      let x0 = w
+      let y0 = h
+      let x1 = -1
+      let y1 = -1
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const a = data[(y * w + x) * 4 + 3]
+          if (a <= 8) continue
+          if (x < x0) x0 = x
+          if (y < y0) y0 = y
+          if (x > x1) x1 = x
+          if (y > y1) y1 = y
+        }
+      }
+      if (x1 < x0 || y1 < y0) return fallback()
+      const bw = x1 - x0 + 1
+      const bh = y1 - y0 + 1
+      const s = Math.max(bw, bh)
+      const out = document.createElement('canvas')
+      out.width = s
+      out.height = s
+      const octx = out.getContext('2d')
+      octx.imageSmoothingEnabled = false
+      octx.drawImage(c, x0, y0, bw, bh, (s - bw) / 2, (s - bh) / 2, bw, bh)
+      return out
+    } catch {
+      return fallback()
+    }
   }
 
   const createSheetDirectionalFrames = (img, cols, rows, cellW, cellH, rowToDir) => {
@@ -328,9 +342,7 @@ export const loadSprites = () => {
         const ctx = cell.getContext('2d')
         ctx.imageSmoothingEnabled = false
         ctx.drawImage(img, c * cellW, r * cellH, cellW, cellH, 0, 0, cellW, cellH)
-        const cropped = cropSquareCanvas(cell)
-        if (!cropped) continue
-        frames[c][r] = cropped
+        frames[c][r] = cropSquareCanvas(cell)
       }
     }
 
