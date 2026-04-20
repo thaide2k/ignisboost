@@ -276,7 +276,90 @@ export const loadSprites = () => {
     return out
   }
 
+  const loadImageOptional = (src) => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => resolve(null)
+      img.src = src
+    })
+  }
+
+  const cropSquareCanvas = (c) => {
+    const ctx = c.getContext('2d')
+    const w = c.width
+    const h = c.height
+    const img = ctx.getImageData(0, 0, w, h)
+    const data = img.data
+    let x0 = w
+    let y0 = h
+    let x1 = -1
+    let y1 = -1
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const a = data[(y * w + x) * 4 + 3]
+        if (a <= 8) continue
+        if (x < x0) x0 = x
+        if (y < y0) y0 = y
+        if (x > x1) x1 = x
+        if (y > y1) y1 = y
+      }
+    }
+    if (x1 < x0 || y1 < y0) return null
+    const bw = x1 - x0 + 1
+    const bh = y1 - y0 + 1
+    const s = Math.max(bw, bh)
+    const out = document.createElement('canvas')
+    out.width = s
+    out.height = s
+    const octx = out.getContext('2d')
+    octx.imageSmoothingEnabled = false
+    octx.drawImage(c, x0, y0, bw, bh, (s - bw) / 2, (s - bh) / 2, bw, bh)
+    return out
+  }
+
+  const createSheetDirectionalFrames = (img, cols, rows, cellW, cellH, rowToDir) => {
+    const frames = Array.from({ length: cols }, () => Array.from({ length: rows }, () => null))
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = document.createElement('canvas')
+        cell.width = cellW
+        cell.height = cellH
+        const ctx = cell.getContext('2d')
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(img, c * cellW, r * cellH, cellW, cellH, 0, 0, cellW, cellH)
+        const cropped = cropSquareCanvas(cell)
+        if (!cropped) continue
+        frames[c][r] = cropped
+      }
+    }
+
+    return frames.map((frameCols) => {
+      const dirs = []
+      for (let r = 0; r < rows; r++) {
+        const di = rowToDir[r]
+        if (di == null) continue
+        dirs[di] = frameCols[r]
+      }
+      const fallback = dirs.find(Boolean) || null
+      for (let i = 0; i < rowToDir.length; i++) {
+        if (!dirs[i]) dirs[i] = fallback
+      }
+      return dirs
+    })
+  }
+
+  const PLAYER_WALK_SHEET = {
+    src: '/assets/sprites/player/player_walk_sheet.png',
+    cols: 4,
+    rows: 8,
+    cellW: 768,
+    cellH: 448,
+    rowToDir: [0, 1, 2, 3, 4, 5, 6, 7]
+  }
+
   const rankedLoads = RANKED_TARGET_MODELS.flatMap((m) => m.frames.map((src) => loadImage(src)))
+  const playerWalkLoad = loadImageOptional(PLAYER_WALK_SHEET.src)
 
   return Promise.all([
     loadImage('/assets/sprites/buildings.png'),
@@ -287,16 +370,30 @@ export const loadSprites = () => {
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/1.png'),
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/2.png'),
     loadImage('/assets/sprites/unluckystudio/Topdown_vehicle_sprites_pack/Police_animation/3.png')
-  ].concat(rankedLoads)).then((imgs) => {
+  ].concat(rankedLoads).concat([playerWalkLoad])).then((imgs) => {
     const [buildings, streets1, streets2, car, taxi, police1, police2, police3] = imgs
     const dirCount = 16
-    const targetsByTier = {}
+    const rankedTargets = {}
     let p = 8
     for (const m of RANKED_TARGET_MODELS) {
       const frames = [imgs[p], imgs[p + 1], imgs[p + 2]]
       p += 3
-      if (!targetsByTier[m.tier]) targetsByTier[m.tier] = {}
-      targetsByTier[m.tier][m.slug] = frames.map((f) => createDirectionalSprites(f, dirCount))
+      if (!rankedTargets[m.tier]) rankedTargets[m.tier] = {}
+      rankedTargets[m.tier][m.model] = frames.map((f) => createDirectionalSprites(f, dirCount))
+    }
+    const playerWalkSheet = imgs[p]
+    const playerWalk = playerWalkSheet
+      ? createSheetDirectionalFrames(
+          playerWalkSheet,
+          PLAYER_WALK_SHEET.cols,
+          PLAYER_WALK_SHEET.rows,
+          PLAYER_WALK_SHEET.cellW,
+          PLAYER_WALK_SHEET.cellH,
+          PLAYER_WALK_SHEET.rowToDir
+        )
+      : null
+    if (debug) {
+      console.log('[debugSprites] loadSprites targetsByTier', Object.fromEntries(Object.entries(rankedTargets).map(([t, m]) => [t, Object.keys(m)])))
     }
     return {
       buildings,
@@ -306,8 +403,12 @@ export const loadSprites = () => {
         dirCount,
         player: createDirectionalSprites(car, dirCount),
         target: createDirectionalSprites(taxi, dirCount),
-        targetsByTier,
+        targetsByTier: rankedTargets,
         police: [police1, police2, police3].map((f) => createDirectionalSprites(f, dirCount))
+      },
+      peds: {
+        playerWalk,
+        playerIdle: playerWalk ? playerWalk[0] : null
       }
     }
   })

@@ -1303,7 +1303,11 @@ function Mission({ contract, onComplete, onExit }) {
           drawCar(ctx, player.x, player.y, player.angle, '#ff6b35', now, { w: 30, h: 16 })
         }
       } else {
-        drawPed(ctx, player.x, player.y, player.angle, now, { color: '#4ade80', highlight: '#ff6b35' })
+        const moving = Math.abs(player.vx || 0) + Math.abs(player.vy || 0) > 0.05
+        const pedSprite = moving ? sprites?.peds?.playerWalk : sprites?.peds?.playerIdle
+        if (!drawVehicleSprite(ctx, player.x, player.y, player.angle, pedSprite, now, { size: 54, highlight: '#ff6b35' })) {
+          drawPed(ctx, player.x, player.y, player.angle, now, { color: '#4ade80', highlight: '#ff6b35' })
+        }
         drawReloadIndicator(ctx, player, gunRef.current, now)
       }
 
